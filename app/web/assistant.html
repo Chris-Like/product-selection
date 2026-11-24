@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能选品助手</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="tabs assistant-nav" aria-label="选品台导航">
+    <span class="tab active" aria-current="page">智能选品助手</span>
+    <a id="assistant-workbench" class="tab" href="/">专业工作台</a>
+    <a id="assistant-settings" class="tab" href="/?view=config">基础配置</a>
+  </nav>
+  <main class="assistant-guide">
+    <h1>智能选品助手</h1>
+    <section class="card" aria-labelledby="guide-step">
+      <h2 id="guide-step" tabindex="-1">正在读取你的需求…</h2>
+      <div id="guide-body"></div>
+      <p id="guide-message" class="hint" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="/assistant.js"></script>
+</body>
+</html>

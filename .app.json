@@ -1,0 +1,9 @@
+{
+  "name": "auto-pick-studio",
+  "displayName": "选品台",
+  "entry": "skills/auto-pick-studio/scripts/start.mjs",
+  "url": "http://127.0.0.1:17860/",
+  "bind": "127.0.0.1",
+  "localOnly": true,
+  "_note": "本机应用声明；端口为示例值，待确认，可用 AUTO_PICK_PORT 覆盖。字段以宿主实际规范为准。"
+}

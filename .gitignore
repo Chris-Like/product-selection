@@ -1,0 +1,10 @@
+node_modules/
+.workbuddy-backup/
+.env
+.env.*
+data/*
+!data/.gitkeep
+playwright/.auth/*
+!playwright/.auth/.gitkeep
+*.log
+*.tmp

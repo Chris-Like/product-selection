@@ -1,0 +1,47 @@
+{
+  "_note": "脱敏样例：只含字段结构与异常类型，不含真实商品标题、店铺、链接与价格数值。B0″ 实测后替换为真实样本集。所有阈值与值域均为占位（null = 待确认）。",
+  "samples": [
+    {
+      "id": "S-01",
+      "kind": "PG-1 正常",
+      "fields": { "item_id": "<id>", "title": "<title>", "source_url": "https://item.taobao.com/item.htm?id=<id>", "price": "<number>", "price_type": "<enum>", "sales_display_band": "<band>", "review_count": "<int>", "shop": "<shop>" },
+      "expect": "记录落库即成功；展示值用档位；价格类型单独成列"
+    },
+    {
+      "id": "S-02",
+      "kind": "PG-1 缺字段",
+      "fields": { "item_id": "<id>", "title": "<title>", "source_url": "https://item.taobao.com/item.htm?id=<id>", "review_count": null },
+      "expect": "评价数标「未获取」，记录仍为 stored，不阻断、不填 0"
+    },
+    {
+      "id": "S-03",
+      "kind": "PG-1 抓错值（选择器漂移）",
+      "fields": { "item_id": "<id>", "title": "<title>", "source_url": "https://item.taobao.com/item.htm?id=<id>", "review_count": "<out-of-range-int>" },
+      "expect": "标「值异常」，可手工改值 / 忽略；字段完整率不能蒙混过关（TC-06 / TC-T4）"
+    },
+    {
+      "id": "S-04",
+      "kind": "PG-2 搜索结果页",
+      "fields": { "card_count": "<int>", "result_count": "<int>" },
+      "expect": "一屏多条独立成记录，共享同一 batch；给价格带 / 竞争密度一个分母，仍标便利样本"
+    },
+    {
+      "id": "S-05",
+      "kind": "领先标的清单",
+      "fields": { "rows": "<int>", "ambiguous": true },
+      "expect": "弱匹配命中多条列候选由本人确认，不自动合并、不自动挂领先标记"
+    },
+    {
+      "id": "S-06",
+      "kind": "已放弃记录",
+      "fields": { "state": "已放弃", "reason": "<text>", "expectation": "<text>" },
+      "expect": "入 append-only 事件流，预期不可改，只能追加更正"
+    },
+    {
+      "id": "S-07",
+      "kind": "不支持页面（购物车 / 订单 / 评价区）",
+      "fields": {},
+      "expect": "行内降级态，不落库、不计成功、不采 PII"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "site_timeout_ms": 30000,
+  "poll_interval_ms": 800,
+  "auth_snapshot_interval_ms": 1500,
+  "_note": "全部为示例值，待确认；B0 真实页面实测后回填，不照抄任何公开行业数字。站点规则未回填时采集走降级态、不落库。"
+}

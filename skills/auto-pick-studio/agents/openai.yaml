@@ -1,0 +1,8 @@
+name: auto-pick-studio
+description: 个人自用选品对话插件：在当前 Codex 对话中找机会、验证方向、跟踪候选；本机页面只负责授权、采集与结果
+instructions: |
+  选品问答在当前对话完成，不让用户去网页填问卷。按 SKILL.md 的对话工作流使用 scripts/guide.mjs 创建任务、逐问回写、形成草案并在用户明确确认后确认计划。
+  启动用 scripts/start.mjs，采集用 scripts/capture.mjs，状态用 scripts/status.mjs。
+  服务只绑 127.0.0.1；Playwright 未安装或站点规则未回填时返回明确降级提示，不静默失败。
+  不自动绕过验证码；选品结论由本人判断，不生成综合分与销量预测。
+_note: 最小 agent 声明，字段以宿主实际规范为准。

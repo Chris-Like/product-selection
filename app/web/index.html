@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>选品台 · 本机</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>选品台</h1>
+    <span id="service-state" class="state-chip">正在连接本机服务…</span>
+    <span id="task-chip" class="state-chip">待运行</span>
+    <span id="result-chip" class="state-chip">0 条</span>
+    <span class="top-note">个人自用 · 数据只留本机 · 不生成综合分</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="页面区域">
+    <button id="tab-config" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-config">基础配置</button>
+    <button id="tab-workbench" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-workbench">专业工作台 <span id="tab-badge" class="badge hidden"></span></button>
+    <span class="tabs-note">按 1 / 2 或 ← / → 切换</span>
+  </nav>
+  <div class="tabs guide-return"><a id="return-to-assistant" class="tab hidden" href="/assistant.html">返回智能选品助手</a></div>
+
+  <div id="auth-alert" class="alert hidden" role="status" aria-live="polite">
+    <span id="auth-alert-text"></span>
+    <button id="auth-alert-go" class="ghost" type="button">去配置页重新登录</button>
+  </div>
+
+  <main>
+    <section id="panel-config" class="panel" role="tabpanel" aria-labelledby="tab-config" hidden>
+      <div id="config" class="card">
+        <h2>采集网站与登录授权</h2>
+        <p class="hint">这里<strong>不录入、也不保存任何密码</strong>。点「登录」会打开一个浏览器窗口，由你本人在里面输入账号密码或扫码；登录后系统把 cookies（登录态）存到本机，采集时免登录。新增站点默认停用；勾选「已核验条款」后才能启用。</p>
+        <form id="site-form" class="form-row">
+          <label>站点标识<input name="site_id" placeholder="taobao" required></label>
+          <label>名称<input name="name" placeholder="淘宝"></label>
+          <label>域名<input name="host" placeholder="taobao.com" required></label>
+          <label>账户标识<input name="account_label" placeholder="本人账号，可辨认即可"></label>
+          <label>登录页地址（可留空）<input name="login_url" placeholder="留空则打开站点首页，自己点登录"></label>
+          <label class="check"><input name="terms_checked" type="checkbox"> 已核验条款</label>
+          <button type="submit">新增站点</button>
+        </form>
+        <div id="site-list" class="list"></div>
+        <div class="inline-actions">
+          <span class="footnote">登录态只存本机 playwright/.auth/，不入库、不上传；登录过期时工作台会提示回到这里重新授权。</span>
+        </div>
+      </div>
+
+      <div id="analysis-settings" class="card">
+        <h2>选品分析方式</h2>
+        <p class="hint">选择 Agent 协作后，找机会、验证方向、跟踪候选都在 Codex 或 WorkBuddy 对话中完成；网页只显示任务、计划与采集结果。纯本机模式不提供 AI 对话。</p>
+        <div class="inline-actions" role="radiogroup" aria-label="选品分析方式">
+          <label class="choice"><input id="mode-local" type="radio" name="analysis-mode" value="local_only"> 纯本机解析</label>
+          <label class="choice"><input id="mode-agent" type="radio" name="analysis-mode" value="agent_assisted"> Agent 协作</label>
+          <span id="analysis-mode-note" class="footnote"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-workbench" class="panel" role="tabpanel" aria-labelledby="tab-workbench">
+      <div id="capture" class="card">
+        <h2>当前生效计划</h2>
+        <div id="plan-summary" class="plan-summary" aria-live="polite">正在读取计划…</div>
+        <div class="inline-actions">
+          <button id="btn-capture" disabled>开始采集</button>
+          <button id="btn-edit-plan" type="button" class="ghost">编辑计划</button>
+          <button id="btn-stop" class="ghost" disabled>停止</button>
+        </div>
+        <div id="task-progress" class="list"></div>
+        <div id="task-message" class="hint"></div>
+      </div>
+
+      <details id="professional-plan" class="card">
+        <summary>编辑专业计划</summary>
+        <p class="hint">无需经过 AI 对话。每行一个检索词；关注点和反例只记录本轮核对口径，不会隐藏采集到的样本。生成草案后，必须确认才能采集。</p>
+        <form id="professional-plan-form" class="professional-plan-form">
+          <label>检索词（每行一个）<textarea id="pro-queries" rows="3" maxlength="500" placeholder="例如：宿舍收纳&#10;桌面收纳"></textarea></label>
+          <label>研究场景（可选）<input id="pro-focus-scene" maxlength="300" placeholder="例如：大学生宿舍"></label>
+          <label>预算上限（元，可选）<input id="pro-max-price" type="number" min="0.01" step="0.01" placeholder="用于结果统计"></label>
+          <label>本轮关注点（可选）<input id="pro-signal-watch" maxlength="300" placeholder="例如：价格展示是否集中"></label>
+          <label>反例检查（可选）<input id="pro-falsifier" maxlength="300" placeholder="例如：检查是否混入大件家具"></label>
+          <label>覆盖口径<select id="pro-coverage-mode"><option value="single_query_exploration">单查询探索</option><option value="compared_queries">对照查询</option></select></label>
+          <div class="inline-actions">
+            <button type="submit">生成计划草案</button>
+            <button id="btn-pro-plan-confirm" class="ghost" type="button" disabled>确认并设为生效计划</button>
+            <span id="pro-plan-state" class="footnote">尚未生成专业计划草案</span>
+          </div>
+        </form>
+      </details>
+
+      <div id="results" class="card">
+        <h2>选品结果</h2>
+        <p class="hint">领先标的（被代拍的品）是经验信号、非预测结论；默认参与排序，可临时关闭看原序，也可看反例。</p>
+        <div class="run-strip" id="run-strip">
+          <button id="scope-latest" class="scope active" type="button">本轮 · <span id="latest-count">0</span> 条</button>
+          <button id="scope-all" class="scope ghost" type="button">全部累计 · <span id="all-count">0</span> 条</button>
+          <label class="scope-picker">历史轮次
+            <select id="scope-select" aria-label="切换历史轮次"><option value="">选择轮次</option></select>
+          </label>
+          <span id="scope-note" class="footnote"></span>
+        </div>
+        <div id="run-outcome" class="plan-summary" role="status"></div>
+        <div id="facts-content" class="result-facts"></div>
+        <div class="inline-actions">
+          <button id="btn-temp-off" class="ghost">临时关闭领先优先</button>
+          <button id="btn-counter" class="ghost">反例视图</button>
+          <button id="btn-undo" class="ghost">撤销</button>
+          <button id="btn-restore" class="ghost">恢复</button>
+          <button id="btn-clear" class="ghost danger">清空</button>
+          <span id="clear-confirm" class="hidden">
+            确定清空本机能采到的业务数据？<button id="btn-clear-yes" class="danger">确定清空</button>
+            <button id="btn-clear-no" class="ghost">取消</button>
+          </span>
+        </div>
+        <div id="coverage" class="footnote"></div>
+        <div id="evidence-controls" class="inline-actions hidden">
+          <span id="evidence-status" role="status"></span>
+          <button id="btn-clear-evidence" class="ghost" type="button">返回全部明细</button>
+        </div>
+        <div id="result-list" class="list"></div>
+      </div>
+
+      <details id="runs-panel" class="card">
+        <summary>采集记录 <span id="runs-count">0</span> 轮 <span class="footnote">· 点任一轮切换上面的结果，不跳页</span></summary>
+        <div id="run-list" class="list"></div>
+      </details>
+      <details id="guide" class="card">
+        <summary>AI 对话任务</summary>
+        <p class="hint">在 Codex 或 WorkBuddy 继续当前对话。</p>
+        <p id="agent-task-state" class="footnote">暂无 AI 选品任务</p>
+        <p id="agent-task-detail" class="footnote"></p>
+      </details>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

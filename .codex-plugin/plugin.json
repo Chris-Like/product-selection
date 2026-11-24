@@ -1,0 +1,13 @@
+{
+  "name": "auto-pick-studio",
+  "version": "1.0.0",
+  "description": "个人自用选品台：本机 Web 页面维护采集站点与账户，Playwright 自动采集，结果回同页",
+  "skills": ["skills/auto-pick-studio"],
+  "scripts": {
+    "start": "skills/auto-pick-studio/scripts/start.mjs",
+    "capture": "skills/auto-pick-studio/scripts/capture.mjs",
+    "status": "skills/auto-pick-studio/scripts/status.mjs"
+  },
+  "app": ".app.json",
+  "_note": "最小清单，字段命名参照 Chris-Like/agent-skills 仓库的 plugins/ 约定；首次安装前请以宿主实际 manifest 规范核验，勿假定字段完整。"
+}

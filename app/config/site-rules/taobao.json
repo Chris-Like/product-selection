@@ -1,0 +1,108 @@
+{
+  "site": "taobao",
+  "version": "v1",
+  "status": "b0_probe_done",
+  "_note": "2026-11-18 B0″ 实测回填：仅 PG-2 搜索结果页的字段经多次只读复查稳定，已回填；PG-1 商品详情页字段在 3 次复查中有 2 次价格区未渲染，且无可用商品标识元素，故全部保持空槽、不猜测、不采集。值域阈值一律保持「示例值，待确认」，本轮未编造任何数字。未登记在 _probe_evidence.fields_confirmed 的字段不得回填。",
+  "market": "domestic",
+  "currency": "CNY",
+  "field_selector_map": {
+    "PG-1": {
+      "item_id": "",
+      "title": "",
+      "source_url": "",
+      "image_url": "",
+      "shop": "",
+      "category": "",
+      "price": "",
+      "price_type": "",
+      "sales_display_band": "",
+      "review_count": "",
+      "listing_date": ""
+    },
+    "PG-2": {
+      "card": "a[class*=\"doubleCardWrapperAdapt--\"]",
+      "item_id": ":scope",
+      "title": "[class*=\"title--\"]",
+      "source_url": ":scope",
+      "image_url": "",
+      "shop": "[class*=\"shopName--\"]",
+      "price": "[class*=\"priceInt--\"]",
+      "price_type": "",
+      "sales_display_band": "[class*=\"realSales--\"]",
+      "card_rank": "",
+      "result_count": ""
+    }
+  },
+  "anchor_selectors": {
+    "PG-1": [],
+    "PG-2": ["[class*=\"doubleCard--\"]"]
+  },
+  "price_type_enum": [],
+  "url_patterns": {
+    "PG-1": ["^https:\\/\\/(item\\.taobao\\.com|detail\\.tmall\\.com)\\/item\\.htm\\?id="],
+    "PG-2": ["^https:\\/\\/s\\.taobao\\.com\\/search"]
+  },
+  "entry_urls": ["https://s.taobao.com/search?q=%E8%BF%9E%E8%A1%A3%E8%A3%99"],
+  "login_urls": [],
+  "challenge_hints": [],
+  "login_required_hints": [],
+  "field_attr_map": {
+    "item_id": "$url:id",
+    "source_url": "$url:canonical"
+  },
+  "_new_slots_note": "challenge_hints / login_required_hints / login_urls 未实测到验证页与登录页特征，保持空槽，不虚构提示词。entry_urls 的关键词为示例值，待确认；M1 先跑淘宝，关键词与页数由采集命令注入。",
+  "_derive_note": "商品详情链接位于卡片外层 A 元素上，卡片内无商品标识元素。field_attr_map 的 $url:id 与 $url:canonical 是声明式派生：从本次真实页面读到的 href 中取 id 参数（纯数字、6 位以上），分别产出商品标识与标准化商品原链。广告位跳转链接的 id 同为真实商品 id，统一规范化到 item.taobao.com 标准商品页；天猫商品是否需按 host 细分尚未实测，标为待复核。不解析任何代码、不拼接未观测的域名。",
+  "value_ranges": {
+    "price_max": null,
+    "review_count_max": null,
+    "title_max": null,
+    "sample_size": null,
+    "recoverable_max": null,
+    "batch_max": null,
+    "capacity_hint": null
+  },
+  "_probe_evidence": {
+    "probed_at": "2026-11-18T14:44:29.479Z",
+    "method": "本人扫码登录生成 playwright/.auth/taobao.json 后，tools/field-probe.mjs 只读复用该登录态访问真实页面；不输出 cookie 内容、不自动回填、不写业务数据。选择器由逐字段卡片级验收确认。",
+    "samples": [
+      {
+        "pageKind": "PG-2",
+        "url": "https://s.taobao.com/search?page=1&q=%E8%BF%9E%E8%A1%A3%E8%A3%99&tab=all",
+        "docTitle": "连衣裙_淘宝搜索",
+        "skeletonNodes": 0,
+        "priceLikeTextNodes": 107,
+        "itemLinks": 33,
+        "bodyTextLength": 4928,
+        "usableForBackfill": true,
+        "cardCount": 48,
+        "confidence": "A：多次只读复查结构一致，48 张卡片字段均可读"
+      },
+      {
+        "pageKind": "PG-1",
+        "url": "https://item.taobao.com/item.htm?id=798636746231",
+        "usableForBackfill": false,
+        "confidence": "C：价格区在 3 次只读复查中 2 次未渲染，且无 canonical / item-id / 商品链接元素",
+        "note": "字段全部保持空槽，不作为采集入口"
+      }
+    ],
+    "fields_confirmed": {
+      "PG-2.card": "a[class*=\"doubleCardWrapperAdapt--\"]，实测 48 个，内含标题、价格、店铺、展示销量",
+      "PG-2.item_id": ":scope 配合 $url:id，实测派生 798636746231 等纯数字商品标识",
+      "PG-2.title": "[class*=\"title--\"]，实测 50 个，样本「意大利TTIT女童连衣裙2026秋冬彩虹蝴蝶结网纱蓬蓬裙洛丽塔公主裙」",
+      "PG-2.source_url": ":scope 配合 $url:canonical，由真实 href 的 id 参数规范化到标准商品页",
+      "PG-2.shop": "[class*=\"shopName--\"]，实测样本「意大利TTIT专柜」",
+      "PG-2.price": "[class*=\"priceInt--\"]，实测样本 234 / 170 / 179（整数部分，页面展示值）",
+      "PG-2.sales_display_band": "[class*=\"realSales--\"]，实测样本「25人付款」「2000+人付款」，是页面展示值不等于真实销量"
+    },
+    "fields_kept_empty": {
+      "PG-1.*": "详情页价格区异步渲染不稳定、无商品标识元素；不回填、不采集",
+      "PG-2.image_url": "图片域名 alicdn.com 不在 URL 白名单内，回填会被误判异常；保持未获取",
+      "PG-2.price_type": "搜索页未实测到稳定的价格类型元素；保持未获取",
+      "PG-2.card_rank": "未实测到稳定序号元素；保持未获取",
+      "PG-2.result_count": "未实测到稳定的结果总数元素；保持未获取",
+      "review_count": "PG-2 探测 0 个候选元素，PG-1 亦无；保持未获取，不填 0"
+    },
+    "not_fabricated": "价格类型枚举、各类值域阈值、验证页提示词、登录页特征、PG-1 全部定位表达式均保持空槽或空数组；本轮未编造任何数字"
+  },
+  "updated_at": "2026-11-18T14:44:29.479Z"
+}

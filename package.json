@@ -1,0 +1,19 @@
+{
+  "name": "auto-pick-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "个人自用选品台：Agent Skill / Plugin 包 + 本机 Web 页面 + Playwright 自动采集",
+  "scripts": {
+    "start": "node skills/auto-pick-studio/scripts/start.mjs",
+    "capture": "node skills/auto-pick-studio/scripts/capture.mjs",
+    "status": "node skills/auto-pick-studio/scripts/status.mjs",
+    "test": "node --test tests/unit/*.test.js",
+    "test:e2e": "node tests/e2e/tc-n-runner.mjs",
+    "check": "node tools/selftest.mjs",
+    "probe": "node tools/field-probe.mjs"
+  },
+  "optionalDependencies": {
+    "playwright": "1.64.0"
+  }
+}
