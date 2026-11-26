@@ -152,6 +152,40 @@ function render(payload, { showRequirements = false, editedQueries } = {}) {
   panel.append(el('div', { class: 'inline-actions' }, [back, start]), notice);
 }
 
+function renderIntake() {
+  step.textContent = '说一句你想找什么';
+  const goal = el('textarea', { id: 'assistant-intake', rows: 4, maxlength: 500,
+    placeholder: '例如：我想买 20 元以内的文具，优先考虑笔记本和中性笔。' });
+  const handoff = el('div', { class: 'assistant-handoff', hidden: true });
+  handoff.hidden = true;
+  const prompt = el('textarea', { id: 'assistant-prompt', rows: 4, readonly: true });
+  const prepare = action('准备选品需求', () => {
+    const text = goal.value.trim();
+    if (!text) { goal.focus(); throw new Error('请先写下你想找什么。'); }
+    prompt.value = `请用智能选品助手帮我选品。我的需求：${text}\n请根据需求准备搜索词，并给我「打开需求卡」的链接。`;
+    handoff.hidden = false;
+    prompt.focus();
+    prompt.select();
+  });
+  const copy = action('复制需求', async () => {
+    try {
+      await navigator.clipboard.writeText(prompt.value);
+      message.textContent = '已复制，粘贴到 Codex 或 WorkBuddy 对话即可。';
+    } catch {
+      prompt.focus();
+      prompt.select();
+      message.textContent = '文字已选中，按 Ctrl+C 复制。';
+    }
+  });
+  goal.addEventListener('input', () => {
+    handoff.hidden = true;
+    message.textContent = '';
+  });
+  handoff.append(el('label', { for: 'assistant-prompt', text: '发给 AI 的需求' }), prompt,
+    copy, el('p', { class: 'hint', text: '将这段需求粘贴到已接入选品助手的 Codex 或 WorkBuddy 对话，再点对话返回的「打开需求卡」。' }));
+  panel.append(el('label', { for: 'assistant-intake', text: '这次的选品需求' }), goal, prepare, handoff);
+}
+
 async function init() {
   if (sessionId) {
     document.querySelector('#assistant-workbench').href = `/?assistant=${encodeURIComponent(sessionId)}`;
@@ -159,12 +193,7 @@ async function init() {
   }
   try {
     if (!sessionId) {
-      step.textContent = '说一句你想找什么';
-      panel.append(
-        el('p', { text: '在接入选品助手的 Codex 或 WorkBuddy 对话里，说出你的想法。例如：' }),
-        el('blockquote', { text: '帮我找 50 元以内、适合宿舍用的收纳用品。' }),
-        el('p', { text: 'AI 整理好需求后，点对话里的「打开需求卡」，就能检查需求、生成搜索词并开始采集。' }),
-      );
+      renderIntake();
       return;
     }
     token = (await request('/api/bootstrap')).token;
