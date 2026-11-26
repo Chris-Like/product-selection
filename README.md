@@ -49,6 +49,8 @@ npx playwright install chromium
 
 ## 3. 双宿主与双触发
 
+跨境选品可使用 FastMoss MCP 或 LinkFox 官方能力，结果回传到「专业工作台 → 外部选品调研」。配置步骤见 [Codex / WorkBuddy 接入说明](hosts/provider-integrations.md)。
+
 | 宿主 | 安装物 | 说明 |
 | --- | --- | --- |
 | WorkBuddy | `skills/auto-pick-studio/SKILL.md` | 复制到用户级 `~/.workbuddy/skills/auto-pick-studio/`，见 `hosts/workbuddy.md` |

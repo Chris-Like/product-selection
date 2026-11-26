@@ -76,6 +76,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   default_sort: 'lead_first',
   // 对话助手是默认入口；纯本机模式留给专业工作台的明确配置。
   analysis_mode: 'agent_assisted',
+  assistant_host: 'codex',
   runtime_limits: { max_queries: 3, max_pages: 1, max_units: 3, request_interval_ms: 1200 },
   columns: ['marker', 'title', 'platform', 'price', 'sales', 'review', 'as_of', 'source_url'],
 });

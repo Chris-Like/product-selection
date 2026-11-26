@@ -26,6 +26,8 @@ description: 个人自用选品台。启动本机页面、维护采集站点与�
 
 ## 对话工作流（Codex / WorkBuddy）
 
+用户明确要求使用 FastMoss、LinkFox 或调研跨境市场时，先读 [外部数据工作流](references/provider-research.md)。跨境查询使用已授权的宿主工具。缺少工具时给出对应宿主的接入说明。
+
 1. 若服务未启动，运行 `scripts/start.mjs`；若用户尚未选择 Agent 协作，提示其在网页配置后继续。
 2. **由插件自动分类，不能把任务类型问题抛给用户**：没有明确方向、询问机会或说“还没想好”用 `opportunity_discovery`；已有商品、场景、类目或风格需要核验用 `direction_validation`；要求复看、比较上次候选或查看变化用 `candidate_follow_up`。仅当三者都无法判断时才问一个自然语言澄清问题。随后运行 `node scripts/guide.mjs start <taskType>`，记录返回的 `session_id` 和 `version`。
 3. 用一句话复述目标，主动给出一到两个可查的方向。已知信息足以拟定计划时直接写草案。只有答案会改变检索范围时才问一个问题，并给可直接选用的答案。用 `node scripts/guide.mjs question <sessionId> <version> <field> "问题" "原因"` 写回，再等待回答。

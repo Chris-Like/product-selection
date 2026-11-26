@@ -213,6 +213,7 @@ td.abnormal { color: var(--danger); }
 .assistant-guide { max-width: 680px; }
 .assistant-guide textarea { margin: 6px 0; }
 .assistant-handoff { margin-top: 16px; }
+.host-launch { background: var(--accent); color: white; border-radius: 6px; padding: 6px 12px; text-decoration: none; }
 .assistant-handoff .hint { margin-top: 8px; }
 .assistant-nav a { text-decoration: none; }
 .workbench-tabs { display: flex; gap: 4px; }

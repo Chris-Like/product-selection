@@ -1,0 +1,3 @@
+[mcp_servers.fastmoss]
+url = "https://mcp.fastmoss.com/mcp"
+auth = "oauth"

@@ -57,6 +57,11 @@
           <label class="choice"><input id="mode-agent" type="radio" name="analysis-mode" value="agent_assisted"> Agent 协作</label>
           <span id="analysis-mode-note" class="footnote"></span>
         </div>
+        <div class="inline-actions">
+          <label for="assistant-host">智能选品助手使用</label>
+          <select id="assistant-host" disabled><option value="codex">Codex</option><option value="workbuddy">WorkBuddy</option></select>
+          <span id="assistant-host-status" class="footnote" role="status"></span>
+        </div>
       </div>
     </section>
 
@@ -126,6 +131,12 @@
       <details id="runs-panel" class="card">
         <summary>采集记录 <span id="runs-count">0</span> 轮 <span class="footnote">· 点任一轮切换上面的结果，不跳页</span></summary>
         <div id="run-list" class="list"></div>
+      </details>
+      <details id="external-research" class="card">
+        <summary>外部选品调研</summary>
+        <p class="hint">外部候选由 Codex 或 WorkBuddy 回传。价格和销量沿用数据来源的口径。</p>
+        <div id="provider-reports" class="list"></div>
+        <button id="refresh-provider-reports" class="ghost" type="button">刷新调研记录</button>
       </details>
       <details id="guide" class="card">
         <summary>AI 对话任务</summary>

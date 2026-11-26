@@ -1,5 +1,6 @@
 /** 本机 HTTP 路由：静态页 + JSON API；所有写操作经 runtime.submit() 单一入口。 */
 import { serveStatic } from './static.js';
+import { providerReportInput } from '../core/service/provider-research.js';
 
 async function readJson(req) {
   const chunks = [];
@@ -37,6 +38,9 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
       // 宿主 AI 的本机桥接独立于网页会话令牌；模型回写不能经普通 Web API 提交。
       if (p.startsWith('/api/agent-bridge/')) {
         if (!agentToken || req.headers['x-auto-pick-agent-token'] !== agentToken) return reply(res, { ok: false, code: 'PERMISSION_DENIED', message: '宿主 AI 桥接校验失败', hint: '从 Skill 的 guide.mjs 领取任务' }, 403);
+        if (req.method === 'POST' && p === '/api/agent-bridge/provider-research') {
+          return reply(res, await runtime.submit({ type: 'PROVIDER_RESEARCH_SAVE', report: providerReportInput(body) }));
+        }
         if (req.method === 'GET' && p === '/api/agent-bridge/next') return reply(res, await runtime.agentNext());
         if (req.method === 'GET' && p === '/api/agent-bridge/readiness') return reply(res, await runtime.assistantReadiness());
         if (agentSession && req.method === 'GET') {
@@ -73,6 +77,14 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
         }
       }
       if (req.method === 'GET' && p === '/api/state') return reply(res, await runtime.state());
+      if (req.method === 'GET' && p === '/api/assistant-host') return reply(res, await runtime.assistantHost());
+      if (req.method === 'POST' && p === '/api/assistant-host') {
+        return reply(res, await runtime.submit({ type: 'ASSISTANT_HOST_UPDATE', host: body.host }));
+      }
+      if (req.method === 'POST' && p === '/api/assistant-host/workbuddy-link') {
+        return reply(res, await runtime.workBuddyHandoff(body.prompt));
+      }
+      if (req.method === 'GET' && p === '/api/provider-research') return reply(res, await runtime.providerReports());
       if (guidedSession) {
         const sessionId = decodeURIComponent(guidedSession[1]);
         if (req.method === 'GET') return reply(res, await runtime.guidedStatus(sessionId));
@@ -128,7 +140,7 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
       if (req.method === 'POST' && p === '/api/workbench-capture') return reply(res, await runtime.submit({ expectedPlanId: body.expectedPlanId, type: 'WORKBENCH_CAPTURE' }));
       if (req.method === 'POST' && p === '/api/capture/stop') return reply(res, runtime.stopCapture());
 
-      if (req.method === 'POST' && p === '/api/command' && !['ASSISTANT_CAPTURE', 'GUIDED_PLAN_STAGE'].includes(body.type)) return reply(res, await runtime.submit(body));
+      if (req.method === 'POST' && p === '/api/command' && !['ASSISTANT_CAPTURE', 'GUIDED_PLAN_STAGE', 'PROVIDER_RESEARCH_SAVE'].includes(body.type)) return reply(res, await runtime.submit(body));
       if (req.method === 'POST' && p === '/api/sites') return reply(res, await runtime.submit({ ...body, type: 'SITE_ADD' }));
       if (siteMatch && req.method === 'PATCH') {
         return reply(res, await runtime.submit({ ...body, siteId: decodeURIComponent(siteMatch[1]), type: 'SITE_UPDATE' }));

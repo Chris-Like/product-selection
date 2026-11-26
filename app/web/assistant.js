@@ -152,17 +152,20 @@ function render(payload, { showRequirements = false, editedQueries } = {}) {
   panel.append(el('div', { class: 'inline-actions' }, [back, start]), notice);
 }
 
-function renderIntake() {
+function renderIntake(config) {
   step.textContent = '说一句你想找什么';
+  const hostLabel = config.host === 'workbuddy' ? 'WorkBuddy' : 'Codex';
   const goal = el('textarea', { id: 'assistant-intake', rows: 4, maxlength: 500,
     placeholder: '例如：我想买 20 元以内的文具，优先考虑笔记本和中性笔。' });
   const handoff = el('div', { class: 'assistant-handoff', hidden: true });
-  handoff.hidden = true;
   const prompt = el('textarea', { id: 'assistant-prompt', rows: 4, readonly: true });
-  const prepare = action('准备选品需求', () => {
+  function makePrompt() {
     const text = goal.value.trim();
     if (!text) { goal.focus(); throw new Error('请先写下你想找什么。'); }
-    prompt.value = `请用智能选品助手帮我选品。我的需求：${text}\n请根据需求准备搜索词，并给我「打开需求卡」的链接。`;
+    return `请使用 auto-pick-studio（智能选品助手）帮我选品。我的需求：${text}\n请根据需求准备搜索词，并给我「打开需求卡」的链接。`;
+  }
+  const prepare = action(config.mode === 'manual' ? '准备 WorkBuddy 需求' : '手动复制需求', () => {
+    prompt.value = makePrompt();
     handoff.hidden = false;
     prompt.focus();
     prompt.select();
@@ -170,7 +173,7 @@ function renderIntake() {
   const copy = action('复制需求', async () => {
     try {
       await navigator.clipboard.writeText(prompt.value);
-      message.textContent = '已复制，粘贴到 Codex 或 WorkBuddy 对话即可。';
+      message.textContent = `已复制，粘贴到 ${hostLabel} 对话即可。`;
     } catch {
       prompt.focus();
       prompt.select();
@@ -182,8 +185,29 @@ function renderIntake() {
     message.textContent = '';
   });
   handoff.append(el('label', { for: 'assistant-prompt', text: '发给 AI 的需求' }), prompt,
-    copy, el('p', { class: 'hint', text: '将这段需求粘贴到已接入选品助手的 Codex 或 WorkBuddy 对话，再点对话返回的「打开需求卡」。' }));
-  panel.append(el('label', { for: 'assistant-intake', text: '这次的选品需求' }), goal, prepare, handoff);
+    copy, el('p', { class: 'hint', text: `粘贴到已安装选品助手的 ${hostLabel} 对话，再点 AI 返回的「打开需求卡」。` }));
+  const buttons = el('div', { class: 'inline-actions' });
+  if (config.host === 'codex') {
+    const link = el('a', { class: 'host-launch', href: 'codex://threads/new', text: '在 Codex 打开' });
+    link.addEventListener('click', (event) => {
+      try {
+        const query = new URLSearchParams({ prompt: makePrompt() });
+        if (config.workspace) query.set('path', config.workspace);
+        link.href = `codex://threads/new?${query}`;
+        message.textContent = '需求已准备好。请在 Codex 对话中核对并发送。';
+      } catch (error) { event.preventDefault(); message.textContent = error.message; }
+    });
+    buttons.append(link);
+  } else if (config.mode === 'prefill') {
+    buttons.append(action('在 WorkBuddy 打开', async () => {
+      const result = await request('/api/assistant-host/workbuddy-link', { prompt: makePrompt() });
+      location.assign(result.url);
+    }));
+  }
+  buttons.append(prepare);
+  panel.append(el('p', { class: 'hint' }, [`当前使用 ${hostLabel} · `, el('a', { href: configUrl(), text: '切换 AI' })]),
+    el('label', { for: 'assistant-intake', text: '这次的选品需求' }), goal, buttons, handoff);
+  if (config.mode === 'manual') panel.append(el('p', { class: 'hint', text: 'WorkBuddy 直连尚未配置，请先使用复制方式。' }));
 }
 
 async function init() {
@@ -192,11 +216,11 @@ async function init() {
     document.querySelector('#assistant-settings').href = configUrl();
   }
   try {
+    token = (await request('/api/bootstrap')).token;
     if (!sessionId) {
-      renderIntake();
+      renderIntake(await request('/api/assistant-host'));
       return;
     }
-    token = (await request('/api/bootstrap')).token;
     render(await request(endpoint));
   } catch (error) {
     step.textContent = '暂时无法打开需求卡';

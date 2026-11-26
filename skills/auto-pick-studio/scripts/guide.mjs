@@ -32,6 +32,7 @@ async function request(method, pathname, body) {
   const payload = await r.json();
   if (!payload.ok) throw new Error(`${payload.message || '请求失败'}${payload.hint ? `：${payload.hint}` : ''}`);
   const data = payload.data;
+  if (command === 'import-research' && data?.id) data.workbench_url = `http://127.0.0.1:${b.port}/?report=${encodeURIComponent(data.id)}#external-research`;
   if (['stage', 'session'].includes(command) && data?.draft?.requirements) {
     data.assistant_url = `http://127.0.0.1:${b.port}/assistant.html?session=${encodeURIComponent(data.session.session_id)}`;
   }
@@ -47,6 +48,12 @@ async function request(method, pathname, body) {
 
 try {
   if (command === 'next') await request('GET', '/api/agent-bridge/next');
+  else if (command === 'import-research') {
+    const [filename] = args;
+    if (!filename || (await fs.stat(filename)).size > 256 * 1024) throw new Error('请提供不超过 256 KB 的外部调研 JSON 文件。');
+    const report = JSON.parse((await fs.readFile(filename, 'utf8')).replace(/^\uFEFF/, ''));
+    await request('POST', '/api/agent-bridge/provider-research', report);
+  }
   else if (command === 'readiness') await request('GET', '/api/agent-bridge/readiness');
   else if (command === 'session') await request('GET', `/api/agent-bridge/sessions/${encodeURIComponent(args[0] || '')}`);
   else if (command === 'start') await request('POST', '/api/agent-bridge/sessions', { taskType: args[0] });
@@ -69,7 +76,7 @@ try {
     const [sessionId, version] = args;
     await request('POST', `/api/agent-bridge/sessions/${encodeURIComponent(sessionId)}`, { action: command, expectedVersion: Number(version), siteId: 'taobao' });
   } else {
-    throw new Error('用法：start | next | readiness | session | question | answer | stage | preview | draft | confirm | confirm-and-capture');
+    throw new Error('用法：start | next | readiness | session | question | answer | stage | preview | draft | confirm | confirm-and-capture | import-research');
   }
 } catch (e) {
   console.error(String(e.message || e));

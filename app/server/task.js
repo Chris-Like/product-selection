@@ -13,6 +13,8 @@ import { createMarkerService } from '../core/service/marker.service.js';
 import { createDecisionService } from '../core/service/decision.service.js';
 import { createRecoveryService } from '../core/service/recovery.service.js';
 import { createAnalysisService } from '../core/service/analysis.service.js';
+import { createProviderResearch } from '../core/service/provider-research.js';
+import { createAssistantHost } from './assistant-host.js';
 import { createCollector } from '../collector/run.js';
 import { loadPlaywright, browserUsable } from '../collector/driver.js';
 import { failure } from '../core/shared/errors.js';
@@ -36,6 +38,8 @@ export async function createTaskRuntime({ repos, paths }) {
     analysis: createAnalysisService({ analysis: repos.AnalysisRepository, settings: repos.SettingsRepository, snapshots: repos.SnapshotRepository, rules: repos.RuleRepository }),
   };
   const collector = createCollector({ repos, services, paths });
+  const providerResearch = createProviderResearch(repos.AnalysisRepository);
+  const host = createAssistantHost(repos.SettingsRepository, paths.root);
 
   async function assistantReadiness() {
     const settings = (await repos.SettingsRepository.get()).data;
@@ -56,6 +60,8 @@ export async function createTaskRuntime({ repos, paths }) {
   }
 
   const handlers = {
+    ASSISTANT_HOST_UPDATE: (command) => host.update(command.host),
+    PROVIDER_RESEARCH_SAVE: (command) => providerResearch.save(command.report),
     SITE_ADD: (c) => {
       const s = c.site || {};
       // 显式白名单：密码类字段一律丢弃，配置页不录密码、服务端不存密码
@@ -224,6 +230,9 @@ export async function createTaskRuntime({ repos, paths }) {
   }
 
   return Object.freeze({
+    assistantHost: host.status,
+    workBuddyHandoff: host.workBuddy,
+    providerReports: () => providerResearch.list(),
     guidedStatus: async (id) => {
       const research = await services.analysis.getResearch(id);
       if (!research.ok || !research.data.draft?.requirements) {

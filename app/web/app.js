@@ -654,7 +654,63 @@ function renderRunOutcome(run, sampleCount) {
   }
 }
 
+async function loadProviderReports() {
+  const list = $('provider-reports');
+  try {
+    const result = await api('/api/provider-research');
+    if (!result.ok) throw new Error();
+    clearNode(list);
+    const reports = result.data || [];
+    const selected = new URLSearchParams(location.search).get('report');
+    if (!reports.length) list.textContent = '暂无外部调研记录。';
+    for (const report of reports) {
+      const provider = report.provider === 'fastmoss' ? 'FastMoss' : 'LinkFox';
+      const block = el('details', { open: report.id === selected }, [
+        el('summary', { text: `${provider} · ${report.platform} / ${report.market} · ${report.query} · ${report.items.length} 条` }),
+        el('p', { class: 'footnote', text: `工具：${report.tool} · 统计时间窗：${report.window} · 由宿主回传` }),
+      ]);
+      for (const item of report.items) {
+        block.append(el('div', { class: 'row' }, [
+          el('strong', { class: 'grow', text: item.title }),
+          el('span', { class: 'footnote', text: item.price == null ? '价格未提供' : `${item.price} ${item.currency}${item.price_type ? `（${item.price_type}）` : ''}` }),
+          item.units_sold == null ? null : el('span', { class: 'footnote', text: `来源口径销量 ${item.units_sold}` }),
+          el('span', { class: 'footnote', text: item.id || item.url }),
+        ]));
+      }
+      list.append(block);
+    }
+  } catch {
+    list.textContent = '暂时无法读取外部调研记录。';
+  }
+}
+
+let savedAssistantHost = null;
+function renderAssistantHost(config) {
+  savedAssistantHost = config;
+  $('assistant-host').value = config.host;
+  $('assistant-host-status').textContent = config.mode === 'prefill'
+    ? '可从助手打开对话并预填需求。'
+    : 'WorkBuddy 预填待配置。可先复制需求到 WorkBuddy。';
+}
+
 function bind() {
+  $('assistant-host').addEventListener('change', async (event) => {
+    const select = event.currentTarget;
+    const host = select.value;
+    select.disabled = true;
+    try {
+      const result = await post('/api/assistant-host', { host });
+      if (result.ok) renderAssistantHost(result.data);
+      else { if (savedAssistantHost) renderAssistantHost(savedAssistantHost); report(result); }
+    } catch {
+      if (savedAssistantHost) renderAssistantHost(savedAssistantHost);
+      $('assistant-host-status').textContent = '未能保存选择，请刷新重试。';
+    } finally { select.disabled = false; }
+  });
+  $('refresh-provider-reports').addEventListener('click', loadProviderReports);
+  $('external-research').addEventListener('toggle', (event) => {
+    if (event.target.open) loadProviderReports();
+  });
   $('tab-config').addEventListener('click', () => switchTab('config'));
   $('tab-workbench').addEventListener('click', () => switchTab('workbench'));
   $('scope-latest').addEventListener('click', () => setScope('latest'));
@@ -785,9 +841,15 @@ async function init() {
   const boot = await api('/api/bootstrap');
   sessionToken = boot.data?.token || '';
   bind();
+  api('/api/assistant-host').then((result) => {
+    if (!result.ok) throw new Error();
+    renderAssistantHost(result.data);
+    $('assistant-host').disabled = false;
+  }).catch(() => { $('assistant-host-status').textContent = '暂时无法读取 AI 配置。'; });
   await post('/api/session/reset', {}); // 页面 load 复位临时排序，不依赖会话存储
   const params = new URLSearchParams(location.search);
   switchTab(params.get('view') === 'config' ? 'config' : 'workbench');
+  if (params.has('report') || location.hash === '#external-research') $('external-research').open = true;
   const selectedBatch = params.get('batch');
   if (selectedBatch) currentScope = selectedBatch;
   await Promise.all([loadState(), loadSites(), loadRuns(), loadEffectivePlan()]);
