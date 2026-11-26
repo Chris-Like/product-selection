@@ -212,9 +212,8 @@ td.abnormal { color: var(--danger); }
 .evidence-options { display: flex; gap: 6px; flex-wrap: wrap; }
 .assistant-guide { max-width: 680px; }
 .assistant-guide textarea { margin: 6px 0; }
-.assistant-nav a, .guide-return a { text-decoration: none; }
-.guide-return { border-bottom: 0; padding-top: 0; }
-.guide-return:has(a.hidden) { display: none; }
+.assistant-nav a { text-decoration: none; }
+.workbench-tabs { display: flex; gap: 4px; }
 .assistant-guide #guide-message:empty { display: none; }
 .result-facts > .evidence-options { margin-bottom: 8px; }
 #evidence-controls.hidden { display: none; }

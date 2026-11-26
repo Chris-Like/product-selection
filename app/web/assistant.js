@@ -158,7 +158,15 @@ async function init() {
     document.querySelector('#assistant-settings').href = configUrl();
   }
   try {
-    if (!sessionId) throw new Error('请从原对话打开需求卡。');
+    if (!sessionId) {
+      step.textContent = '说一句你想找什么';
+      panel.append(
+        el('p', { text: '在接入选品助手的 Codex 或 WorkBuddy 对话里，说出你的想法。例如：' }),
+        el('blockquote', { text: '帮我找 50 元以内、适合宿舍用的收纳用品。' }),
+        el('p', { text: 'AI 整理好需求后，点对话里的「打开需求卡」，就能检查需求、生成搜索词并开始采集。' }),
+      );
+      return;
+    }
     token = (await request('/api/bootstrap')).token;
     render(await request(endpoint));
   } catch (error) {

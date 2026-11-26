@@ -119,8 +119,7 @@ async function loadResearchStatus() {
   researchSession = payload?.session || null;
   const assistant = returnSession || (payload?.draft?.requirements ? researchSession?.session_id : null);
   const returnLink = $('return-to-assistant');
-  returnLink.classList.toggle('hidden', !assistant);
-  if (assistant) returnLink.href = `/assistant.html?session=${encodeURIComponent(assistant)}`;
+  returnLink.href = assistant ? `/assistant.html?session=${encodeURIComponent(assistant)}` : '/assistant.html';
   const state = $('agent-task-state');
   const detail = $('agent-task-detail');
   if (!researchSession) {

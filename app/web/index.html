@@ -15,12 +15,14 @@
     <span class="top-note">个人自用 · 数据只留本机 · 不生成综合分</span>
   </header>
 
-  <nav class="tabs" role="tablist" aria-label="页面区域">
-    <button id="tab-config" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-config">基础配置</button>
-    <button id="tab-workbench" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-workbench">专业工作台 <span id="tab-badge" class="badge hidden"></span></button>
+  <nav class="tabs assistant-nav" aria-label="选品台导航">
+    <a id="return-to-assistant" class="tab" href="/assistant.html">智能选品助手</a>
+    <div class="workbench-tabs" role="tablist" aria-label="工作台页面">
+      <button id="tab-workbench" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-workbench">专业工作台 <span id="tab-badge" class="badge hidden"></span></button>
+      <button id="tab-config" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-config">基础配置</button>
+    </div>
     <span class="tabs-note">按 1 / 2 或 ← / → 切换</span>
   </nav>
-  <div class="tabs guide-return"><a id="return-to-assistant" class="tab hidden" href="/assistant.html">返回智能选品助手</a></div>
 
   <div id="auth-alert" class="alert hidden" role="status" aria-live="polite">
     <span id="auth-alert-text"></span>
