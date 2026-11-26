@@ -239,6 +239,7 @@ async function loadFacts(batchId) {
 
 function switchTab(name, refresh = false) {
   const isConfig = name === 'config';
+  $('workspace-title').textContent = isConfig ? '基础配置' : '专业工作台';
   $('panel-config').hidden = !isConfig;
   $('panel-workbench').hidden = isConfig;
   $('tab-config').classList.toggle('active', isConfig);
@@ -390,6 +391,7 @@ function renderProgress(task) {
   $('btn-stop').disabled = !captureRunning;
   const text = STATE_TEXT[task?.state] || task?.state || '待运行';
   $('task-chip').textContent = text;
+  $('task-chip').dataset.state = task?.state || '';
   if (task?.state === 'running') {
     const b = $('tab-badge');
     b.textContent = '运行中';
@@ -460,8 +462,11 @@ function batchLabel(id) {
   return i >= 0 ? `#${i + 1}` : '—';
 }
 function updateScopeButtons() {
-  $('scope-latest').classList.toggle('active', currentScope === 'latest');
-  $('scope-all').classList.toggle('active', currentScope === 'all');
+  for (const scope of ['latest', 'all']) {
+    const button = $(`scope-${scope}`);
+    button.setAttribute('aria-pressed', String(currentScope === scope));
+    button.classList.toggle('active', currentScope === scope);
+  }
   $('scope-select').value = (currentScope === 'latest' || currentScope === 'all') ? '' : currentScope;
 }
 
@@ -626,6 +631,7 @@ async function loadResults() {
 
 function renderRunOutcome(run, sampleCount) {
   const box = $('run-outcome');
+  box.dataset.state = currentScope === 'all' ? '' : run?.state || '';
   clearNode(box);
   if (currentScope === 'all') {
     box.textContent = `累计可见 ${sampleCount ?? 0} 条观察`;
@@ -654,29 +660,59 @@ function renderRunOutcome(run, sampleCount) {
   }
 }
 
-async function loadProviderReports() {
-  const list = $('provider-reports');
+async function loadProviderReports(source, selectedReport) {
+  const list = document.querySelector(`[data-reports="${source}"]`);
   try {
-    const result = await api('/api/provider-research');
+    const result = await api(`/api/provider-research?provider=${encodeURIComponent(source)}`);
     if (!result.ok) throw new Error();
     clearNode(list);
     const reports = result.data || [];
-    const selected = new URLSearchParams(location.search).get('report');
+    const selected = selectedReport || new URLSearchParams(location.search).get('report');
     if (!reports.length) list.textContent = '暂无外部调研记录。';
     for (const report of reports) {
-      const provider = report.provider === 'fastmoss' ? 'FastMoss' : 'LinkFox';
+      const names = { fastmoss: 'FastMoss', linkfox: 'LinkFox', taobao_alliance: '淘宝联盟', retail_csv: '表格导入' };
+      const provider = names[report.provider];
+      const retail = ['retail_csv', 'taobao_alliance'].includes(report.provider);
       const block = el('details', { open: report.id === selected }, [
         el('summary', { text: `${provider} · ${report.platform} / ${report.market} · ${report.query} · ${report.items.length} 条` }),
-        el('p', { class: 'footnote', text: `工具：${report.tool} · 统计时间窗：${report.window} · 由宿主回传` }),
+        el('p', { class: 'footnote', text: `来源：${report.tool} · ${retail ? '观察时间' : '统计时间窗'}：${report.window}` }),
       ]);
-      for (const item of report.items) {
-        block.append(el('div', { class: 'row' }, [
+      const rows = el('div', { class: 'list' });
+      function budgetGroup(item) {
+        if (item.price == null || item.currency !== 'CNY') return 'unknown';
+        return item.price <= report.budget ? 'budget' : 'over';
+      }
+      function renderItems(group = 'all') {
+        clearNode(rows);
+        const items = report.items.filter((item) => group === 'all' || budgetGroup(item) === group);
+        if (!items.length) rows.append(el('p', { class: 'hint', text: '此分组暂无候选。' }));
+        for (const item of items) {
+          rows.append(el('div', { class: 'row' }, [
           el('strong', { class: 'grow', text: item.title }),
           el('span', { class: 'footnote', text: item.price == null ? '价格未提供' : `${item.price} ${item.currency}${item.price_type ? `（${item.price_type}）` : ''}` }),
           item.units_sold == null ? null : el('span', { class: 'footnote', text: `来源口径销量 ${item.units_sold}` }),
-          el('span', { class: 'footnote', text: item.id || item.url }),
-        ]));
+          retail ? el('span', { class: 'footnote', text: item.spec || '规格待核对' }) : null,
+          item.url?.startsWith('https://') ? el('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', text: '打开原页核验' }) : el('span', { class: 'footnote', text: item.id }),
+          ]));
+        }
       }
+      if (retail) block.append(el('p', { class: 'hint', text: '运费或优惠待核对，价格以商品页和结算页为准。' }));
+      if (retail && report.budget != null) {
+        const groups = { budget: `${report.budget} 元及以内`, over: '超预算', unknown: '无可比价格', all: '全部候选' };
+        const buttons = el('div', { class: 'inline-actions', role: 'group', 'aria-label': '预算分组' });
+        for (const [group, label] of Object.entries(groups)) {
+          const count = report.items.filter((item) => group === 'all' || budgetGroup(item) === group).length;
+          const button = el('button', { class: 'ghost', type: 'button', 'aria-pressed': String(group === 'budget'),
+            text: `${label} ${count} 条`, onclick: () => {
+              for (const other of buttons.children) other.setAttribute('aria-pressed', String(other === button));
+              renderItems(group);
+            } });
+          buttons.append(button);
+        }
+        block.append(buttons);
+      }
+      renderItems(retail && report.budget != null ? 'budget' : 'all');
+      block.append(rows);
       list.append(block);
     }
   } catch {
@@ -707,10 +743,55 @@ function bind() {
       $('assistant-host-status').textContent = '未能保存选择，请刷新重试。';
     } finally { select.disabled = false; }
   });
-  $('refresh-provider-reports').addEventListener('click', loadProviderReports);
-  $('external-research').addEventListener('toggle', (event) => {
-    if (event.target.open) loadProviderReports();
+  for (const trigger of document.querySelectorAll('[data-open-module]')) {
+    trigger.addEventListener('click', () => { $(trigger.dataset.openModule).open = true; });
+  }
+  for (const trigger of document.querySelectorAll('[data-refresh-reports]')) {
+    trigger.addEventListener('click', () => loadProviderReports(trigger.dataset.refreshReports));
+  }
+  for (const id of ['fastmoss', 'linkfox']) $(
+    `${id}-research`).addEventListener('toggle', (event) => { if (event.target.open) loadProviderReports(id); });
+  $('retail-research').addEventListener('toggle', async (event) => {
+    if (!event.target.open) return;
+    await Promise.all([loadProviderReports('taobao_alliance'), loadProviderReports('retail_csv')]);
+    try {
+      $('retail-api-state').textContent = (await api('/api/retail/status')).data.configured
+        ? '已配置接口，查询后会生成独立候选报告。' : '接口未配置。可以先导入下方的 CSV。';
+    } catch { $('retail-api-state').textContent = '暂时无法检查接口状态。'; }
   });
+  for (const kind of ['import', 'search']) {
+    $(`retail-${kind}-form`).addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const fields = new FormData(form);
+      const feedback = $('retail-feedback');
+      const submit = form.querySelector('button');
+      submit.disabled = true;
+      feedback.textContent = kind === 'import' ? '正在导入…' : '正在查询…';
+      try {
+        const budget = fields.get('budget') ? Number(fields.get('budget')) : null;
+        let payload;
+        if (kind === 'import') {
+          const file = fields.get('file');
+          if (file.size > 100_000) throw new Error('请选择 100 KB 以内的 CSV 文件');
+          payload = { csv: await file.text(), budget, platform: fields.get('platform'),
+            source: fields.get('source'), observedAt: fields.get('observedAt') };
+        } else {
+          payload = { queries: fields.get('queries').split(/\r?\n/), budget };
+        }
+        const r = await post(`/api/retail/${kind}`, payload);
+        if (!r.ok) { feedback.textContent = [r.message, r.hint].filter(Boolean).join('。'); return; }
+        if (kind === 'import') {
+          feedback.textContent = `已导入 ${r.data.items.length} 条候选。`;
+          await loadProviderReports('retail_csv', r.data.id);
+        } else {
+          feedback.textContent = r.data.map((row) => `${row.query}：${row.report ? row.report.items.length + ' 条' : row.message || '没有返回候选'}`).join(' · ');
+          await loadProviderReports('taobao_alliance', r.data.find((row) => row.report)?.report.id);
+        }
+      } catch (error) { feedback.textContent = error.message || '操作未完成'; }
+      finally { submit.disabled = false; }
+    });
+  }
   $('tab-config').addEventListener('click', () => switchTab('config'));
   $('tab-workbench').addEventListener('click', () => switchTab('workbench'));
   $('scope-latest').addEventListener('click', () => setScope('latest'));
@@ -849,7 +930,12 @@ async function init() {
   await post('/api/session/reset', {}); // 页面 load 复位临时排序，不依赖会话存储
   const params = new URLSearchParams(location.search);
   switchTab(params.get('view') === 'config' ? 'config' : 'workbench');
-  if (params.has('report') || location.hash === '#external-research') $('external-research').open = true;
+  const modules = ['retail-research', 'fastmoss-research', 'linkfox-research'];
+  const module = location.hash.slice(1);
+  if (modules.includes(module)) $(module).open = true;
+  else if (params.has('report') || module === 'external-research') {
+    for (const id of modules) $(id).open = true;
+  }
   const selectedBatch = params.get('batch');
   if (selectedBatch) currentScope = selectedBatch;
   await Promise.all([loadState(), loadSites(), loadRuns(), loadEffectivePlan()]);

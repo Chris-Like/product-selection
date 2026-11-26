@@ -7,22 +7,16 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="top">
-    <h1>选品台</h1>
-    <span id="service-state" class="state-chip">正在连接本机服务…</span>
-    <span id="task-chip" class="state-chip">待运行</span>
-    <span id="result-chip" class="state-chip">0 条</span>
-    <span class="top-note">个人自用 · 数据只留本机 · 不生成综合分</span>
+  <header class="app-header">
+    <nav class="tabs assistant-nav" aria-label="选品台导航">
+      <span class="app-brand"><span aria-hidden="true" class="app-mark"></span>选品台</span>
+      <a id="return-to-assistant" class="tab" href="/assistant.html">智能选品助手</a>
+      <div class="workbench-tabs" role="tablist" aria-label="工作台页面">
+        <button id="tab-workbench" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-workbench">专业工作台 <span id="tab-badge" class="badge hidden"></span></button>
+        <button id="tab-config" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-config">基础配置</button>
+      </div>
+    </nav>
   </header>
-
-  <nav class="tabs assistant-nav" aria-label="选品台导航">
-    <a id="return-to-assistant" class="tab" href="/assistant.html">智能选品助手</a>
-    <div class="workbench-tabs" role="tablist" aria-label="工作台页面">
-      <button id="tab-workbench" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-workbench">专业工作台 <span id="tab-badge" class="badge hidden"></span></button>
-      <button id="tab-config" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-config">基础配置</button>
-    </div>
-    <span class="tabs-note">按 1 / 2 或 ← / → 切换</span>
-  </nav>
 
   <div id="auth-alert" class="alert hidden" role="status" aria-live="polite">
     <span id="auth-alert-text"></span>
@@ -30,6 +24,14 @@
   </div>
 
   <main>
+    <div class="page-heading">
+      <h1 id="workspace-title">专业工作台</h1>
+      <div class="workspace-state" aria-label="本机状态">
+        <span id="service-state" class="state-chip">正在连接本机服务…</span>
+        <span id="task-chip" class="state-chip">待运行</span>
+        <span id="result-chip" class="state-chip">0 条</span>
+      </div>
+    </div>
     <section id="panel-config" class="panel" role="tabpanel" aria-labelledby="tab-config" hidden>
       <div id="config" class="card">
         <h2>采集网站与登录授权</h2>
@@ -66,6 +68,11 @@
     </section>
 
     <section id="panel-workbench" class="panel" role="tabpanel" aria-labelledby="tab-workbench">
+      <nav class="module-links" aria-label="选品数据模块">
+        <a href="#retail-research" data-open-module="retail-research">国内零售</a>
+        <a href="#fastmoss-research" data-open-module="fastmoss-research">FastMoss 趋势</a>
+        <a href="#linkfox-research" data-open-module="linkfox-research">LinkFox 选品与货源</a>
+      </nav>
       <div id="capture" class="card">
         <h2>当前生效计划</h2>
         <div id="plan-summary" class="plan-summary" aria-live="polite">正在读取计划…</div>
@@ -132,11 +139,40 @@
         <summary>采集记录 <span id="runs-count">0</span> 轮 <span class="footnote">· 点任一轮切换上面的结果，不跳页</span></summary>
         <div id="run-list" class="list"></div>
       </details>
-      <details id="external-research" class="card">
-        <summary>外部选品调研</summary>
-        <p class="hint">外部候选由 Codex 或 WorkBuddy 回传。价格和销量沿用数据来源的口径。</p>
-        <div id="provider-reports" class="list"></div>
-        <button id="refresh-provider-reports" class="ghost" type="button">刷新调研记录</button>
+      <details id="retail-research" class="card">
+        <summary>国内零售 · 接口查询、表格导入与原页核验</summary>
+        <h3>淘宝联盟查询</h3>
+        <p id="retail-api-state" class="hint"></p>
+        <form id="retail-search-form" class="professional-plan-form">
+          <label>搜索词（每行一个，最多三个）<textarea name="queries" rows="3" maxlength="245" required placeholder="A5 笔记本&#10;中性笔套装"></textarea></label>
+          <label>预算上限（元）<input name="budget" type="number" min=".01" step=".01" placeholder="20"></label>
+          <div class="inline-actions"><button>查询国内商品</button></div>
+        </form>
+        <h3>导入已授权导出的 CSV</h3>
+        <p class="hint">先另存为 UTF-8 CSV。表头：title,price,currency,price_type,spec,url,id。至少提供 title 和 url 或 id，缺价留空。</p>
+        <form id="retail-import-form" class="professional-plan-form">
+          <label>CSV 文件<input name="file" type="file" accept=".csv,text/csv" required></label>
+          <label>数据来源<input name="source" maxlength="120" required placeholder="例如：商家授权导出"></label>
+          <label>站点<select name="platform"><option value="taobao">淘宝</option><option value="tmall">天猫</option><option value="jd">京东</option><option value="pinduoduo">拼多多</option><option value="douyin">抖音</option><option value="other_cn">其他国内渠道</option></select></label>
+          <label>观察日期<input name="observedAt" type="date" required></label>
+          <label>预算上限（元）<input name="budget" type="number" min=".01" step=".01" placeholder="20"></label>
+          <div class="inline-actions"><button>导入候选</button></div>
+        </form>
+        <p id="retail-feedback" role="status"></p>
+        <div class="list" data-reports="taobao_alliance"></div>
+        <div class="list" data-reports="retail_csv"></div>
+      </details>
+      <details id="fastmoss-research" class="card">
+        <summary>FastMoss · TikTok Shop 趋势</summary>
+        <p class="hint">在已授权的 Codex 或 WorkBuddy 中调用 FastMoss，回传后在这里查看对应市场和时间窗的结果。</p>
+        <div class="list" data-reports="fastmoss"></div>
+        <button class="ghost" type="button" data-refresh-reports="fastmoss">刷新 FastMoss 记录</button>
+      </details>
+      <details id="linkfox-research" class="card">
+        <summary>LinkFox · 跨境选品与 1688 货源</summary>
+        <p class="hint">使用宿主中已授权的 LinkFox 选品或货源能力，结果按来源平台和币种展示。</p>
+        <div class="list" data-reports="linkfox"></div>
+        <button class="ghost" type="button" data-refresh-reports="linkfox">刷新 LinkFox 记录</button>
       </details>
       <details id="guide" class="card">
         <summary>AI 对话任务</summary>

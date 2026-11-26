@@ -13,8 +13,10 @@ import { createMarkerService } from '../core/service/marker.service.js';
 import { createDecisionService } from '../core/service/decision.service.js';
 import { createRecoveryService } from '../core/service/recovery.service.js';
 import { createAnalysisService } from '../core/service/analysis.service.js';
-import { createProviderResearch } from '../core/service/provider-research.js';
+import { createProviderResearch, providerReportInput } from '../core/service/provider-research.js';
 import { createAssistantHost } from './assistant-host.js';
+import { createTaobaoAlliance } from './taobao-alliance.js';
+import { retailCsvItems } from '../core/service/retail-csv.js';
 import { createCollector } from '../collector/run.js';
 import { loadPlaywright, browserUsable } from '../collector/driver.js';
 import { failure } from '../core/shared/errors.js';
@@ -40,6 +42,7 @@ export async function createTaskRuntime({ repos, paths }) {
   const collector = createCollector({ repos, services, paths });
   const providerResearch = createProviderResearch(repos.AnalysisRepository);
   const host = createAssistantHost(repos.SettingsRepository, paths.root);
+  const alliance = createTaobaoAlliance();
 
   async function assistantReadiness() {
     const settings = (await repos.SettingsRepository.get()).data;
@@ -230,6 +233,49 @@ export async function createTaskRuntime({ repos, paths }) {
   }
 
   return Object.freeze({
+    retailStatus: () => ok({ configured: alliance.configured }),
+    retailImport: async (input) => {
+      if (!['taobao', 'tmall', 'jd', 'pinduoduo', 'douyin', 'other_cn'].includes(input?.platform) ||
+        typeof input.source !== 'string' || !input.source.trim() ||
+        typeof input.observedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.observedAt) ||
+        Number.isNaN(Date.parse(input.observedAt)) ||
+        (input.budget != null && (!Number.isFinite(input.budget) || input.budget <= 0))) {
+        return err('STORAGE_FAILED', '请填写来源、平台及观察日期', '按表格导入区的要求补齐');
+      }
+      let items;
+      try { items = retailCsvItems(input.csv); }
+      catch (error) { return err('STORAGE_FAILED', error.message, '检查 CSV 表头和行格式'); }
+      return submit({ type: 'PROVIDER_RESEARCH_SAVE', report: providerReportInput({
+        provider: 'retail_csv', platform: input.platform, market: 'CN', query: input.query || '表格候选',
+        tool: input.source, window: input.observedAt, budget: input.budget, items,
+      }) });
+    },
+    retailSearch: async (input) => {
+      const queries = Array.isArray(input?.queries) ? [...new Set(input.queries
+        .filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean))] : [];
+      const budget = input?.budget ?? null;
+      if (!queries.length || queries.length > 3 || queries.some((query) => query.length > 80) ||
+        (budget !== null && (!Number.isFinite(budget) || budget <= 0))) {
+        return err('STORAGE_FAILED', '请输入 1 至 3 个搜索词，预算为正数或留空', '修改查询条件后重试');
+      }
+      if (!alliance.configured) return err('PERMISSION_DENIED', '淘宝联盟接口尚未配置', '可以先用表格导入');
+      const results = [];
+      for (const query of queries) {
+        try {
+          const items = await alliance.search(query, budget);
+          if (!items.length) { results.push({ query, status: 'empty' }); continue; }
+          const report = await submit({ type: 'PROVIDER_RESEARCH_SAVE', report: providerReportInput({
+            provider: 'taobao_alliance', platform: 'taobao', market: 'CN', query, budget,
+            tool: '淘宝联盟物料搜索', window: new Date().toISOString(), items,
+          }) });
+          results.push(report.ok ? { query, status: 'done', report: report.data } : { query, status: 'failed', message: report.message });
+        } catch (error) {
+          results.push({ query, status: 'failed', message: error.name === 'TimeoutError' ? '淘宝联盟查询超时' :
+            error.message.startsWith('淘宝联盟') ? error.message : '淘宝联盟查询未完成，请检查网络或权限' });
+        }
+      }
+      return ok(results);
+    },
     assistantHost: host.status,
     workBuddyHandoff: host.workBuddy,
     providerReports: () => providerResearch.list(),

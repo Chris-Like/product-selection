@@ -7,17 +7,31 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <nav class="tabs assistant-nav" aria-label="选品台导航">
-    <span class="tab active" aria-current="page">智能选品助手</span>
-    <a id="assistant-workbench" class="tab" href="/">专业工作台</a>
-    <a id="assistant-settings" class="tab" href="/?view=config">基础配置</a>
-  </nav>
+  <header class="app-header">
+    <nav class="tabs assistant-nav" aria-label="选品台导航">
+      <span class="app-brand"><span aria-hidden="true" class="app-mark"></span>选品台</span>
+      <span class="tab active" aria-current="page">智能选品助手</span>
+      <a id="assistant-workbench" class="tab" href="/">专业工作台</a>
+      <a id="assistant-settings" class="tab" href="/?view=config">基础配置</a>
+    </nav>
+  </header>
   <main class="assistant-guide">
-    <h1>智能选品助手</h1>
-    <section class="card" aria-labelledby="guide-step">
+    <div class="page-heading"><h1>智能选品助手</h1></div>
+    <section class="card assistant-card" aria-labelledby="guide-step">
+      <ol id="guide-stages" class="guide-stages" aria-label="选品步骤" hidden>
+        <li><span class="stage-icon" aria-hidden="true">1</span>需求</li>
+        <li><span class="stage-icon" aria-hidden="true">2</span>选品建议</li>
+        <li><span class="stage-icon" aria-hidden="true">3</span>采集结果</li>
+      </ol>
       <h2 id="guide-step" tabindex="-1">正在读取你的需求…</h2>
       <div id="guide-body"></div>
       <p id="guide-message" class="hint" role="status"></p>
+    </section>
+    <section id="guide-next" class="card" aria-label="下一次选品" hidden>
+      <button id="guide-next-toggle" class="assistant-next-button" type="button" aria-expanded="false" aria-controls="guide-next-body">
+        <span aria-hidden="true">＋</span> 再找一个商品
+      </button>
+      <div id="guide-next-body" hidden></div>
     </section>
   </main>
   <script type="module" src="/assistant.js"></script>

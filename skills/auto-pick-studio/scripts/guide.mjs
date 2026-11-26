@@ -32,7 +32,12 @@ async function request(method, pathname, body) {
   const payload = await r.json();
   if (!payload.ok) throw new Error(`${payload.message || '请求失败'}${payload.hint ? `：${payload.hint}` : ''}`);
   const data = payload.data;
-  if (command === 'import-research' && data?.id) data.workbench_url = `http://127.0.0.1:${b.port}/?report=${encodeURIComponent(data.id)}#external-research`;
+  if (command === 'import-research' && data?.id) {
+    data.workbench_url = `http://127.0.0.1:${b.port}/?report=${encodeURIComponent(data.id)}#${data.provider}-research`;
+  }
+  if (command === 'retail-search') {
+    for (const row of data) if (row.report) row.workbench_url = `http://127.0.0.1:${b.port}/?report=${encodeURIComponent(row.report.id)}#retail-research`;
+  }
   if (['stage', 'session'].includes(command) && data?.draft?.requirements) {
     data.assistant_url = `http://127.0.0.1:${b.port}/assistant.html?session=${encodeURIComponent(data.session.session_id)}`;
   }
@@ -48,6 +53,12 @@ async function request(method, pathname, body) {
 
 try {
   if (command === 'next') await request('GET', '/api/agent-bridge/next');
+  else if (command === 'retail-search') {
+    const [words = '', ceiling] = args;
+    const budget = ceiling ? Number(ceiling) : null;
+    if (ceiling && (!Number.isFinite(budget) || budget <= 0)) throw new Error('预算需为正数或留空');
+    await request('POST', '/api/agent-bridge/retail-search', { queries: words.split('|'), budget });
+  }
   else if (command === 'import-research') {
     const [filename] = args;
     if (!filename || (await fs.stat(filename)).size > 256 * 1024) throw new Error('请提供不超过 256 KB 的外部调研 JSON 文件。');

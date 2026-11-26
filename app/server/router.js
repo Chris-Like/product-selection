@@ -39,8 +39,10 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
       if (p.startsWith('/api/agent-bridge/')) {
         if (!agentToken || req.headers['x-auto-pick-agent-token'] !== agentToken) return reply(res, { ok: false, code: 'PERMISSION_DENIED', message: '宿主 AI 桥接校验失败', hint: '从 Skill 的 guide.mjs 领取任务' }, 403);
         if (req.method === 'POST' && p === '/api/agent-bridge/provider-research') {
+          if (!['fastmoss', 'linkfox'].includes(body?.provider)) return reply(res, { ok: false, message: '国内数据请使用零售查询或表格导入接口' }, 400);
           return reply(res, await runtime.submit({ type: 'PROVIDER_RESEARCH_SAVE', report: providerReportInput(body) }));
         }
+        if (req.method === 'POST' && p === '/api/agent-bridge/retail-search') return reply(res, await runtime.retailSearch(body));
         if (req.method === 'GET' && p === '/api/agent-bridge/next') return reply(res, await runtime.agentNext());
         if (req.method === 'GET' && p === '/api/agent-bridge/readiness') return reply(res, await runtime.assistantReadiness());
         if (agentSession && req.method === 'GET') {
@@ -84,7 +86,10 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
       if (req.method === 'POST' && p === '/api/assistant-host/workbuddy-link') {
         return reply(res, await runtime.workBuddyHandoff(body.prompt));
       }
-      if (req.method === 'GET' && p === '/api/provider-research') return reply(res, await runtime.providerReports());
+      if (req.method === 'GET' && p === '/api/provider-research') return reply(res, await runtime.providerReports(u.searchParams.get('provider')));
+      if (req.method === 'GET' && p === '/api/retail/status') return reply(res, runtime.retailStatus());
+      if (req.method === 'POST' && p === '/api/retail/import') return reply(res, await runtime.retailImport(body));
+      if (req.method === 'POST' && p === '/api/retail/search') return reply(res, await runtime.retailSearch(body));
       if (guidedSession) {
         const sessionId = decodeURIComponent(guidedSession[1]);
         if (req.method === 'GET') return reply(res, await runtime.guidedStatus(sessionId));

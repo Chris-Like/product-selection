@@ -1,5 +1,11 @@
 # 外部选品数据接入
 
+## 国内零售
+
+专业工作台的「国内零售」可查询淘宝联盟、导入 UTF-8 CSV，并打开结果中的商品原页核验。CSV 表头示例为 `title,price,currency,price_type,spec,url,id`。至少填写标题及商品标识或链接，币种留空按人民币处理。导入时同时记录数据提供者、站点和观察日期。需要预算筛选时，系统使用人民币展示价或估价。
+
+申请接口权限后，在本机服务进程的环境中设置 `AUTO_PICK_TBK_APP_KEY`、`AUTO_PICK_TBK_APP_SECRET`、`AUTO_PICK_TBK_SESSION`、`AUTO_PICK_TBK_ADZONE_ID` 并重启。查询使用淘宝联盟的推广商品池，价格字段是联盟估价。没有权限时可以用授权导出的 CSV。 [淘宝开放平台接口文档](https://developer.alibaba.com/docs/api.htm?apiId=64758)
+
 ## 选品助手使用的 AI
 
 从「基础配置 → 选品分析方式」选择 Codex 或 WorkBuddy。小白入口会按此选项生成对应的对话入口。
@@ -14,7 +20,7 @@
 - **Codex 桌面端**：在插件中添加自定义 MCP 服务，URL 为 `https://mcp.fastmoss.com/mcp`，选择 OAuth 并在 FastMoss 登录页授权。按需在对话中选中 FastMoss。CLI 可参考同目录的 `fastmoss.codex.toml.example` 添加配置，运行 `codex mcp login fastmoss`，再检查工具是否可见。 [FastMoss 配置](https://developers.fastmoss.com/zh/docs/mcp/setup.html) · [Codex MCP 文档](https://developers.openai.com/codex/mcp)
 - **WorkBuddy**：在「专家·技能·连接器」的「连接器」页搜索 FastMoss，添加并完成 FastMoss 账户授权，然后在任务内启用连接器。 [FastMoss 各宿主配置](https://developer.fastmoss.com/docs/mcp/setup)
 
-验证请求可用「使用 FastMoss 查询 TikTok Shop 美国站最近 7 天的文具商品。列出 3 件候选，说明查询日期、币种和数据来源，并保存到选品工作台」。先确认宿主确实返回工具结果，再查看工作台的「外部选品调研」。
+验证请求可用「使用 FastMoss 查询 TikTok Shop 美国站最近 7 天的文具商品。列出 3 件候选，说明查询日期、币种和数据来源，并保存到选品工作台」。先确认宿主确实返回工具结果，再查看工作台的「FastMoss 趋势」。
 
 ## LinkFox
 

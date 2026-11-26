@@ -26,14 +26,18 @@ description: 个人自用选品台。启动本机页面、维护采集站点与�
 
 ## 对话工作流（Codex / WorkBuddy）
 
-用户明确要求使用 FastMoss、LinkFox 或调研跨境市场时，先读 [外部数据工作流](references/provider-research.md)。跨境查询使用已授权的宿主工具。缺少工具时给出对应宿主的接入说明。
+从智能选品助手发来「开始一个新的选品任务」时，每次都创建独立会话。先给出选品建议和「打开需求卡」链接，等用户在网页点击「开始采集」，或在对话里明确授权采集。
+
+先区分买商品、找销售机会或找货源。用户说「想买 20 元内的文具」时，按国内零售处理，提议具体搜索词，例如「A5 笔记本」「中性笔套装」。得到明确查询请求或确认后，优先用 `node skills/auto-pick-studio/scripts/guide.mjs retail-search "A5 笔记本|中性笔套装" 20`。只把人民币有价且不超过预算的商品列入预算候选，注明联盟估价、规格及运费或优惠待核对。接口缺权限时引导到 `/#retail-research` 导入供应商允许导出的 CSV。用户需要核验具体商品时提供其原页链接。
+
+用户说「想找能卖的文具」时，先明确目标销售平台和市场；找 TikTok Shop 机会优先 FastMoss，找跨境商品或 1688 货源可用 LinkFox。先读 [外部数据工作流](references/provider-research.md)，用已授权的宿主工具。缺少工具时给出对应宿主的接入说明。
 
 1. 若服务未启动，运行 `scripts/start.mjs`；若用户尚未选择 Agent 协作，提示其在网页配置后继续。
 2. **由插件自动分类，不能把任务类型问题抛给用户**：没有明确方向、询问机会或说“还没想好”用 `opportunity_discovery`；已有商品、场景、类目或风格需要核验用 `direction_validation`；要求复看、比较上次候选或查看变化用 `candidate_follow_up`。仅当三者都无法判断时才问一个自然语言澄清问题。随后运行 `node scripts/guide.mjs start <taskType>`，记录返回的 `session_id` 和 `version`。
 3. 用一句话复述目标，主动给出一到两个可查的方向。已知信息足以拟定计划时直接写草案。只有答案会改变检索范围时才问一个问题，并给可直接选用的答案。用 `node scripts/guide.mjs question <sessionId> <version> <field> "问题" "原因"` 写回，再等待回答。
 4. 用户回答后，运行 `node scripts/guide.mjs answer <sessionId> <version> "回答"`。基于返回的新版本，继续问一个问题，或形成草案。
 5. 整理成一两句可供用户核对的需求摘要。用 `node scripts/guide.mjs stage <sessionId> <version> "搜索词1|搜索词2" "关注点" "反例检查" "预算上限" "需求摘要"` 准备需求卡，没有预算时金额传空字符串。先在对话中展示需求摘要，提供 `assistant_url` 作为「打开需求卡」链接。用户也可留在对话中回复「生成搜索词」或提出修改。修改需求后用当前版本重新 `stage`。
-   用户回复「生成搜索词」时，先用 `session <sessionId>` 读取当前步骤。需求待预览时调用 `preview <sessionId> <version>`（已预览时直接读取结果）。给出可修改的搜索词、查找范围、关注点与未知内容，再邀请用户说「开始采集」。网页按钮预览宿主已准备好的建议。
+   网页打开需求卡时自动展示宿主准备的建议，用户可修改搜索词并开始采集。用户留在对话中回复「生成搜索词」时，先用 `session <sessionId>` 读取当前步骤。需求待预览时调用 `preview <sessionId> <version>`（已预览时直接读取结果）。给出可修改的搜索词、查找范围、关注点与未知内容，再邀请用户说「开始采集」。
    展示计划时可以先用 `node scripts/guide.mjs readiness` 检查是否可开始。返回 `setup_url` 时，只说明当前需要的操作，并给出对应设置链接。完成设置后沿用这份草案。
    用户明确给出预算上限时，说明预算用于采后统计，保留所有原始观察。
 6. 用户明确同意采集后，运行 `node scripts/guide.mjs confirm-and-capture <sessionId> <version>`，使用同一份已展示草案确认并执行一轮。若只同意保存计划，使用 `confirm`。一旦发出采集请求，等待本轮结果。
