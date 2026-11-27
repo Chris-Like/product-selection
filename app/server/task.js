@@ -12,16 +12,17 @@ import { createQueryService } from '../core/service/query.service.js';
 import { createMarkerService } from '../core/service/marker.service.js';
 import { createDecisionService } from '../core/service/decision.service.js';
 import { createRecoveryService } from '../core/service/recovery.service.js';
-import { createAnalysisService } from '../core/service/analysis.service.js';
+import { createAnalysisService, localAssistantGuidance, needsLocalDraftRepair } from '../core/service/analysis.service.js';
 import { createProviderResearch, providerReportInput } from '../core/service/provider-research.js';
 import { createAssistantHost } from './assistant-host.js';
+import { generateCodexSelection } from './codex-selection.js';
 import { createTaobaoAlliance } from './taobao-alliance.js';
 import { retailCsvItems } from '../core/service/retail-csv.js';
 import { createCollector } from '../collector/run.js';
 import { loadPlaywright, browserUsable } from '../collector/driver.js';
 import { failure } from '../core/shared/errors.js';
 
-export async function createTaskRuntime({ repos, paths }) {
+export async function createTaskRuntime({ repos, paths, generateSelection = generateCodexSelection }) {
   const common = {
     snapshots: repos.SnapshotRepository,
     events: repos.EventRepository,
@@ -43,6 +44,62 @@ export async function createTaskRuntime({ repos, paths }) {
   const providerResearch = createProviderResearch(repos.AnalysisRepository);
   const host = createAssistantHost(repos.SettingsRepository, paths.root);
   const alliance = createTaobaoAlliance();
+  const assistantJobs = new Map();
+  let activeAssistantJob;
+
+  async function generateAssistantPlan(text) {
+    if (await services.analysis.getMode() !== 'agent_assisted') {
+      return err('PERMISSION_DENIED', '请在基础配置中开启 Agent 协作。', '开启后回到助手点击下一步');
+    }
+    if ((await host.status()).data.host !== 'codex') {
+      return err('PERMISSION_DENIED', '网页内生成目前支持 Codex。请在基础配置选择 Codex。', '切换后回到助手点击下一步');
+    }
+    const controller = new AbortController();
+    let timer;
+    let guidance;
+    let localFallback = false;
+    try {
+      guidance = await Promise.race([
+        generateSelection(text, { signal: controller.signal }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Codex timeout')), 12_000); }),
+      ]);
+    } catch {
+      controller.abort();
+      guidance = localAssistantGuidance(text);
+      localFallback = true;
+      if (!guidance.queries.length) return err('STORAGE_FAILED', '暂未识别到商品名，请补充具体商品后重试。', '例如：20 元以内的 A5 笔记本');
+    } finally {
+      clearTimeout(timer);
+    }
+    const started = await services.analysis.startAgentResearch({ taskType: guidance.taskType });
+    if (!started.ok) return started;
+    const sessionId = started.data.session.session_id;
+    const staged = await submit({ type: 'GUIDED_PLAN_STAGE', sessionId, expectedVersion: started.data.session.version, localFallback,
+      guidance: { ...guidance, type: 'guided_plan' } });
+    if (!staged.ok) return staged;
+    return submit({ type: 'GUIDED_PLAN_UPDATE', sessionId, expectedVersion: staged.data.session.version, action: 'preview' });
+  }
+
+  function startAssistantJob(input) {
+    const text = typeof input.requirements === 'string' ? input.requirements.trim() : '';
+    if (!text || text.length > 500) return err('STORAGE_FAILED', '请填写 1 至 500 字的选品需求', '补充需求后再点下一步');
+    if (!/^[a-f0-9-]{36}$/i.test(input.jobId || '')) return err('STORAGE_FAILED', '请刷新助手后再试', '生成任务缺少标识');
+    const existing = assistantJobs.get(input.jobId) || activeAssistantJob;
+    if (existing) return ok(existing);
+
+    const job = { id: input.jobId, requirements: text, state: 'running' };
+    assistantJobs.set(job.id, job);
+    activeAssistantJob = job;
+    if (assistantJobs.size > 20) assistantJobs.delete(assistantJobs.keys().next().value);
+    void generateAssistantPlan(text).then((result) => {
+      if (result.ok) { job.state = 'done'; job.result = result.data; }
+      else { job.state = 'failed'; job.message = result.message; }
+    }).catch(() => {
+      job.state = 'failed';
+      job.message = '生成建议失败，请重试。';
+    }).finally(() => { activeAssistantJob = null; });
+    return ok(job);
+  }
 
   async function assistantReadiness() {
     const settings = (await repos.SettingsRepository.get()).data;
@@ -277,6 +334,8 @@ export async function createTaskRuntime({ repos, paths }) {
       return ok(results);
     },
     assistantHost: host.status,
+    startAssistantJob,
+    assistantJob: (id) => ok(assistantJobs.get(id) || null),
     workBuddyHandoff: host.workBuddy,
     providerReports: () => providerResearch.list(),
     guidedStatus: async (id) => {
@@ -287,7 +346,10 @@ export async function createTaskRuntime({ repos, paths }) {
       const { session, draft } = research.data;
       const run = session.batch_id ? (await repos.RunRepository.find(session.batch_id)).data : null;
       const facts = run?.ended_at ? (await repos.AnalysisRepository.get(`facts:${run.batch_id}`)).data : null;
-      return ok({ session, draft, run, facts });
+      const localRecommendations = draft.local_fallback ? localAssistantGuidance(draft.requirements).recommendations : [];
+      const displayDraft = localRecommendations.length > (draft.recommendations?.length || 0)
+        ? { ...draft, recommendations: localRecommendations } : draft;
+      return ok({ session, draft: displayDraft, run, facts, needs_local_repair: session.state === 'plan_draft' && needsLocalDraftRepair(draft) });
     },
     assistantReadiness: async () => ok(await assistantReadiness()),
     stopCapture: handlers.CAPTURE_STOP,

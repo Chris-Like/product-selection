@@ -117,7 +117,8 @@ async function loadResearchStatus() {
   const r = await api('/api/research/latest');
   const payload = r.ok ? r.data : null;
   researchSession = payload?.session || null;
-  const assistant = returnSession || (payload?.draft?.requirements ? researchSession?.session_id : null);
+  const localDraft = localStorage.getItem('auto-pick-assistant-draft:new');
+  const assistant = returnSession || (!localDraft && payload?.draft?.requirements ? researchSession?.session_id : null);
   const returnLink = $('return-to-assistant');
   returnLink.href = assistant ? `/assistant.html?session=${encodeURIComponent(assistant)}` : '/assistant.html';
   const state = $('agent-task-state');
@@ -724,9 +725,9 @@ let savedAssistantHost = null;
 function renderAssistantHost(config) {
   savedAssistantHost = config;
   $('assistant-host').value = config.host;
-  $('assistant-host-status').textContent = config.mode === 'prefill'
-    ? '可从助手打开对话并预填需求。'
-    : 'WorkBuddy 预填待配置。可先复制需求到 WorkBuddy。';
+  $('assistant-host-status').textContent = config.host === 'codex'
+    ? '网页内生成建议使用本机已登录的 Codex CLI。'
+    : 'WorkBuddy 可在宿主对话中使用。网页内生成建议请选择 Codex。';
 }
 
 function bind() {

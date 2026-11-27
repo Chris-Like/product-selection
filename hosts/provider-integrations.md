@@ -8,12 +8,12 @@
 
 ## 选品助手使用的 AI
 
-从「基础配置 → 选品分析方式」选择 Codex 或 WorkBuddy。小白入口会按此选项生成对应的对话入口。
+从「基础配置 → 选品分析方式」选择 Codex 或 WorkBuddy。在智能选品助手网页点击「下一步」生成建议时，选择 Codex 并确保本机 Codex CLI 已登录。WorkBuddy 可以从其宿主对话发起选品。
 
 - **Codex** 使用桌面端深链接打开本项目工作区的新对话，并预填需求。需要已安装桌面应用及本项目 Skill，核对后在 Codex 发送。 [桌面端命令文档](https://learn.chatgpt.com/docs/app/commands#deep-links)
 - **WorkBuddy** 使用第三方应用开放平台登记的应用身份生成一次性预填链接。启动本机服务前，在服务进程的环境中提供 `AUTO_PICK_WORKBUDDY_APP_ID`、`AUTO_PICK_WORKBUDDY_KEY_ID`、`AUTO_PICK_WORKBUDDY_KEY_FILE`。最后一项是 RSA-2048 PEM 私钥的绝对路径，放在仓库外。用户在 WorkBuddy 官方中间页确认打开后，可在对话核对并发送。未配置时可复制需求。 [WorkBuddy 第三方应用指南](https://open.workbuddy.cn/docs/third-party-app)
 
-宿主选择负责打开对话。数据源的授权仍按下面的 FastMoss 与 LinkFox 说明在宿主中完成。
+FastMoss 与 LinkFox 的数据授权仍在各宿主中完成。
 
 ## FastMoss
 

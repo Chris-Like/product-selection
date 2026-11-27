@@ -283,6 +283,18 @@ td.abnormal { color: var(--danger); }
   overflow-wrap: anywhere;
 }
 .guide-outcome { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.guide-recommendations { display: grid; gap: 8px; padding-left: 28px; }
+.guide-recommendations li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+.guide-recommendations li::marker { color: var(--accent-strong); font-weight: 600; }
+.guide-recommendations p { margin: 3px 0 0; }
+.guide-product-choice { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.guide-query-editor:not([hidden]) { display: grid; gap: 4px; margin: 8px 0; }
+.guide-recommendations + .hint { margin-top: 8px; }
+.guide-capture-actions { position: sticky; bottom: 0; z-index: 1; padding: 8px 0; margin: 0; background: var(--surface); border-top: 1px solid var(--border); }
+.guide-capture-actions .hint { margin: 0; }
+.guide-search-settings { padding: 8px 12px; margin: 12px 0; border: 1px solid var(--border); border-radius: 6px; }
+.guide-search-settings summary { cursor: pointer; font-weight: 500; }
+.guide-search-settings label { display: block; margin-top: 8px; }
 :is(.plan-summary, .guide-outcome, .state-chip)[data-state='done'] { background: var(--ok-bg); border-color: var(--ok-border); }
 :is(.plan-summary, .guide-outcome, .state-chip):is([data-state='partial'], [data-state='not_started'], [data-state='stopped']) {
   background: var(--warn-bg);

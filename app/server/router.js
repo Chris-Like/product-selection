@@ -80,6 +80,10 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
       }
       if (req.method === 'GET' && p === '/api/state') return reply(res, await runtime.state());
       if (req.method === 'GET' && p === '/api/assistant-host') return reply(res, await runtime.assistantHost());
+      if (p === '/api/assistant-guide') {
+        if (req.method === 'POST') return reply(res, runtime.startAssistantJob(body));
+        if (req.method === 'GET') return reply(res, runtime.assistantJob(u.searchParams.get('job')));
+      }
       if (req.method === 'POST' && p === '/api/assistant-host') {
         return reply(res, await runtime.submit({ type: 'ASSISTANT_HOST_UPDATE', host: body.host }));
       }
@@ -96,7 +100,7 @@ export function createRouter({ runtime, paths, sessionToken = null, agentToken =
         if (req.method === 'POST' && body.action === 'capture') {
           return reply(res, await runtime.submit({ sessionId, expectedVersion: Number(body.expectedVersion), guidedOnly: true, type: 'ASSISTANT_CAPTURE' }));
         }
-        if (req.method === 'POST' && ['preview', 'edit', 'requirements'].includes(body.action)) {
+        if (req.method === 'POST' && ['preview', 'edit', 'requirements', 'refresh_local'].includes(body.action)) {
           return reply(res, await runtime.submit({ sessionId, expectedVersion: body.expectedVersion,
             queries: body.queries, requirements: body.requirements, max_price: body.max_price,
             action: body.action, type: 'GUIDED_PLAN_UPDATE' }));

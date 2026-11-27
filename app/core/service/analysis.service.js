@@ -8,6 +8,34 @@ const templates = [
 ];
 const TASK_TYPES = new Set(['opportunity_discovery', 'direction_validation', 'candidate_follow_up']);
 const budgetLimit = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+export const GUIDED_QUERY_LIMIT = 25;
+const studentStationeryDirections = [
+  { name: 'A5 横线笔记本', reason: '适合课堂笔记和错题整理，适用科目多。', check: '比较页数、纸张克重和是否透墨。' },
+  { name: '0.5mm 中性笔套装', reason: '用于作业和考试练习，属于日常消耗品。', check: '核对每套支数、颜色、是否含笔杆，检查断墨和漏墨评价。' },
+  { name: '学生透明文件袋', reason: '便于分科收纳试卷和讲义，也方便查看袋内内容。', check: '核对能否平放 A4 纸、封口做工和每套数量。' },
+  { name: '单词卡片环扣套装', reason: '方便按单元整理和随身复习。', check: '核对张数、纸张厚度及环扣闭合。' },
+  { name: '简约学生笔袋', reason: '集中收纳日常用笔、橡皮和尺子。', check: '核对长度、拉链和内层缝线。' },
+  { name: '学生软抄作业本', reason: '用于随堂练习和日常作业。', check: '核对内页格式、册数和装订。' },
+  { name: 'B5 方格笔记本', reason: '适合计算过程、草图和表格整理。', check: '核对格距、页数和纸张透墨情况。' },
+  { name: 'A4 错题活页本', reason: '可按科目增减页面，便于复习。', check: '核对孔距、是否含内页和环扣强度。' },
+  { name: '学生按动自动铅笔', reason: '便于草稿和画图，免去削笔。', check: '核对笔芯直径、按动顺畅度和夹芯稳定性。' },
+  { name: 'HB 学生铅笔套装', reason: '适合日常书写和草图练习。', check: '核对支数、笔芯是否易断和外壳做工。' },
+  { name: '学生考试 2B 铅笔', reason: '适用于需要铅笔填涂的练习。', check: '确认笔芯标识、实际考试要求和套装配件。' },
+  { name: '学生软橡皮擦', reason: '适合日常修改铅笔字迹。', check: '检查擦除残留、掉屑及是否容易擦破纸。' },
+  { name: '带屑盒卷笔刀', reason: '便于收集笔屑，适合书桌或笔袋使用。', check: '核对可用笔径、屑盒盖和刀片固定情况。' },
+  { name: '学生修正带套装', reason: '可用于允许涂改的日常笔记和作业。', check: '核对长度、带宽和是否易断带。' },
+  { name: '学生低饱和荧光笔', reason: '便于标记重点和区分知识层级。', check: '核对颜色数量及纸背是否透色。' },
+  { name: '红色批注中性笔', reason: '方便订正、批注和区分原题。', check: '核对是否含笔杆、颜色和出墨稳定性。' },
+  { name: '透明学生直尺', reason: '便于画线和读取刻度。', check: '核对尺寸、刻度清晰度和边缘做工。' },
+  { name: '学生几何尺套装', reason: '覆盖直线、角度和常用几何作图。', check: '核对三角尺和量角器是否齐全、刻度是否清晰。' },
+  { name: '学生安全圆规', reason: '用于课堂几何作图和练习。', check: '核对防护盖、转轴松紧及可替换笔芯。' },
+  { name: '可移除索引标签贴', reason: '便于标记教材章节和错题页。', check: '核对尺寸和移除后是否残胶。' },
+  { name: '学生便签纸套装', reason: '适合记录待办和临时学习提示。', check: '核对实际张数、粘性及书写手感。' },
+  { name: 'A4 学生试卷分类册', reason: '可按科目集中归档已完成的试卷。', check: '核对内袋数量、能否放入 A4 纸和封面耐用性。' },
+  { name: 'A4 学生书皮套装', reason: '便于保护频繁取用的教材封面。', check: '核对适配书本尺寸、厚度及是否需要剪裁。' },
+  { name: '学生固体胶棒套装', reason: '适合手工课及粘贴纸质笔记。', check: '核对每支净重、封口情况和粘贴效果。' },
+  { name: '学生长尾夹套装', reason: '用于临时固定卷子和多页讲义。', check: '核对夹口尺寸、数量及弹簧力度。' },
+];
 
 function priceFacts(rows, ceiling) {
   const prices = rows.map(comparableDisplayPrice).filter((price) => price !== null);
@@ -36,6 +64,40 @@ function keywordFromMessage(value) {
     .replace(/^(一款|一些|几款)/u, '')
     .trim()
     .slice(0, 80);
+}
+
+function normalizeSelectionText(text) {
+  return text.normalize('NFKC').replace(/(\d)\s*[快塊](?=\s*[钱錢])/gu, '$1块')
+    .replace(/(块\s*)錢/gu, '$1钱').replace(/以內|之內/gu, (unit) => `${unit[0]}内`).trim();
+}
+
+export function localAssistantGuidance(requirements) {
+  const text = normalizeSelectionText(requirements);
+  const budget = /(?:预算\s*(?:上限\s*)?(?:为|是|:|控制在|不超过|不高于)?\s*(\d+(?:\.\d{1,2})?)\s*(?:人民币|元|块\s*钱?|圆)?(?:\s*(?:以内|以下|之内|内))?|(?:不超过|不高于|最多|至多)\s*(\d+(?:\.\d{1,2})?)\s*(?:元|块\s*钱?|圆)|(\d+(?:\.\d{1,2})?)\s*(?:元|块\s*钱?|圆)\s*(?:以内|以下|之内|内))/u;
+  const match = text.match(budget);
+  const subject = text.replaceAll(new RegExp(budget.source, 'gu'), '').split(/[，,；;。！？!?]/u)[0]
+    .replace(/^(?:(?:我\s*)?(?:想要?|准备|希望)?\s*(?:帮我\s*)?(?:做选品|选品|选购|购买|买|找)\s*)+/u, '')
+    .replace(/^\s*的\s*/u, '')
+    .split(/(?:要求|希望|优先考虑|优先找)/u)[0].trim();
+  const keyword = keywordFromMessage(subject);
+  const preferences = text.match(/(?:优先考虑|优先找)\s*([^。！？；;]+)/u)?.[1];
+  const preferred = preferences ? preferences.split(/[、，,]|和/u).map(keywordFromMessage).filter(Boolean) : [];
+  const stationery = /^(?:学生(?:用|实用)?\s*)?文具(?:用品)?$/u.test(keyword);
+  const studentStationery = stationery && /学生|上学|课堂/u.test(text);
+  const recommendations = stationery ? studentStationeryDirections : [];
+  const seeds = recommendations.length && (studentStationery || !preferred.length) ? recommendations.map(({ name }) => name) : [keyword];
+  const queries = [...new Set([...preferred, ...seeds].filter(Boolean))].slice(0, seeds.length > 1 ? GUIDED_QUERY_LIMIT : 3);
+  const taskType = /选品|销售机会|好卖/u.test(text) ? 'opportunity_discovery' : 'direction_validation';
+  const maxPrice = match ? budgetLimit(Number(match[1] || match[2] || match[3])) : null;
+  const summary = studentStationery ? '学生实用文具，优先核对做工、材质和日常使用需求。' : null;
+  return { requirements, summary, recommendations, queries, taskType, max_price: maxPrice,
+    signal_watch: studentStationery ? '核对学生日常用途、套装数量与规格。质量可先查纸张厚度、笔芯规格或文件袋材质，再抽查评价或样品。' : null,
+    falsifier: studentStationery ? '排除低价配件、规格不明和大包装起批。是否愿意购买需再验证。' : null };
+}
+
+export function needsLocalDraftRepair(draft) {
+  return Boolean(draft?.local_fallback && !draft.local_queries_edited && draft.queries?.some((query) =>
+    /^(?:我(?:想|选品)|帮我)|^\s*\d+(?:\.\d+)?\s*(?:元|块\s*钱?|圆)\s*(?:以内|以下|之内|内)/u.test(normalizeSelectionText(query))));
 }
 
 function entryForKeyword(entry, keyword) {
@@ -97,7 +159,7 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
   }
   async function setIntent(c = {}) {
     const batchId = c.batchId || `batch:${Date.now()}`;
-    const supplied = (c.keywords || []).map((x) => String(x).trim().slice(0, 80)).filter(Boolean).slice(0, 3);
+    const supplied = (c.keywords || []).map((x) => String(x).trim().slice(0, 80)).filter(Boolean).slice(0, c.guided ? GUIDED_QUERY_LIMIT : 3);
     const keywords = supplied.length ? supplied : (() => {
       const keyword = keywordFromMessage(c.user_message);
       return keyword ? [keyword] : [];
@@ -276,7 +338,7 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
     if (Number(c.expectedVersion) !== Number(session.version)) return err('STALE_WRITE', '计划草案已变化', '刷新后重新确认');
     const draft = found.data.draft;
     const batchId = `batch:${randomUUID()}`;
-    const intent = await setIntent({ batchId, keywords: draft.queries, source: draft.source, focus_scene: session.answers.category_or_scene || session.answers.direction_text || null, falsifier: draft.falsifier, max_price: draft.max_price, task_type: session.task_type, mode: session.mode });
+    const intent = await setIntent({ batchId, keywords: draft.queries, guided: Boolean(draft.requirements), source: draft.source, focus_scene: session.answers.category_or_scene || session.answers.direction_text || null, falsifier: draft.falsifier, max_price: draft.max_price, task_type: session.task_type, mode: session.mode });
     if (!intent.ok) return intent;
     const plan = await compile({ batchId, siteId: c.siteId || 'taobao' });
     if (!plan.ok) return plan;
@@ -326,10 +388,20 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
       return ok({ session: next, question: next.current_turn });
     }
     if (type === 'plan_draft' || type === 'guided_plan') {
-      const queries = Array.isArray(c.guidance.queries) ? c.guidance.queries.map((x) => keywordFromMessage(x)).filter(Boolean).slice(0, 3) : [];
+      const guided = type === 'guided_plan';
+      const queries = Array.isArray(c.guidance.queries) ? c.guidance.queries.map((x) => keywordFromMessage(x)).filter(Boolean).slice(0, guided ? GUIDED_QUERY_LIMIT : 3) : [];
       const draft = { ...draftFromSession(session), draft_id: `draft:${randomUUID()}`, source: 'host_llm', queries, keyword: queries[0] || '', signal_watch: c.guidance.signal_watch ? String(c.guidance.signal_watch).slice(0, 200) : null, falsifier: c.guidance.falsifier ? String(c.guidance.falsifier).slice(0, 300) : null, unknown: Array.isArray(c.guidance.unknown) ? c.guidance.unknown.map((x) => String(x).slice(0, 200)).slice(0, 5) : [] };
       draft.max_price = budgetLimit(c.guidance.max_price);
-      const guided = type === 'guided_plan';
+      if (guided && c.localFallback) {
+        draft.source = 'local_template';
+        draft.local_fallback = true;
+        draft.requirements_summary = c.guidance.summary || null;
+      }
+      if (guided && Array.isArray(c.guidance.recommendations)) {
+        draft.recommendations = c.guidance.recommendations.filter((item) =>
+          [item?.name, item?.reason, item?.check].every((text) => typeof text === 'string' && text.trim()))
+          .slice(0, GUIDED_QUERY_LIMIT).map(({ name, reason, check }) => ({ name: name.slice(0, 80), reason: reason.slice(0, 200), check: check.slice(0, 200) }));
+      }
       draft.requirements = guided ? String(c.guidance.requirements || '').trim().slice(0, 500) : null;
       if (guided && (!draft.requirements || !queries.length)) {
         return err('STORAGE_FAILED', '需求或搜索词建议为空', '先补齐需求摘要和至少一个搜索词');
@@ -343,7 +415,7 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
   }
 
   async function updateGuidedPlan(c = {}) {
-    if (!['preview', 'edit', 'requirements'].includes(c.action)) {
+    if (!['preview', 'edit', 'requirements', 'refresh_local'].includes(c.action)) {
       return err('STORAGE_FAILED', '未知的引导操作', '请刷新需求卡');
     }
     const found = await getResearch(c.sessionId);
@@ -358,10 +430,22 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
     if (c.action === 'edit') {
       const queries = Array.isArray(c.queries)
         ? [...new Set(c.queries.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean))] : [];
-      if (!queries.length || queries.length > 3 || queries.some((query) => query.length > 80)) {
-        return err('STORAGE_FAILED', '请输入 1 至 3 个搜索词，每个最多 80 字', '每行填写一个搜索词');
+      if (!queries.length || queries.length > GUIDED_QUERY_LIMIT || queries.some((query) => query.length > 80)) {
+        return err('STORAGE_FAILED', `请输入 1 至 ${GUIDED_QUERY_LIMIT} 个搜索词，每个最多 80 字`, '检查已勾选商品的搜索词');
       }
-      await analysis.set(`plan-draft:${session.session_id}`, { ...draft, queries, keyword: queries[0] });
+      await analysis.set(`plan-draft:${session.session_id}`, { ...draft, queries, keyword: queries[0],
+        ...(draft.local_fallback ? { local_queries_edited: true } : {}) });
+    }
+    if (c.action === 'refresh_local') {
+      if (!draft.local_fallback) return err('PERMISSION_DENIED', '仅本机草案支持重新整理', '可直接编辑搜索词');
+      const guidance = localAssistantGuidance(draft.requirements);
+      if (!guidance.queries.length) return err('STORAGE_FAILED', '请补充具体商品名', '修改需求后再试');
+      await analysis.set(`plan-draft:${session.session_id}`, {
+        ...draft, queries: guidance.queries, keyword: guidance.queries[0], max_price: draft.max_price ?? guidance.max_price,
+        requirements_summary: guidance.summary, recommendations: guidance.recommendations,
+        signal_watch: guidance.signal_watch, falsifier: guidance.falsifier,
+        requirements_changed: false, local_queries_edited: false,
+      });
     }
     if (c.action === 'requirements') {
       const requirements = typeof c.requirements === 'string' ? c.requirements.trim() : '';
@@ -370,11 +454,14 @@ export function createAnalysisService({ analysis, settings, snapshots, rules }) 
         return err('STORAGE_FAILED', '请填写需求，预算需为正数或留空', '修改后再检查搜索词');
       }
       const changed = requirements !== draft.requirements;
+      const localGuidance = changed && draft.local_fallback ? localAssistantGuidance(requirements) : null;
       await analysis.set(`plan-draft:${session.session_id}`, {
         ...draft, requirements, max_price: maxPrice,
+        requirements_summary: changed ? localGuidance?.summary ?? null : draft.requirements_summary,
+        recommendations: changed ? localGuidance?.recommendations ?? [] : draft.recommendations,
         requirements_changed: changed || draft.requirements_changed || false,
-        signal_watch: changed ? null : draft.signal_watch,
-        falsifier: changed ? null : draft.falsifier,
+        signal_watch: changed ? localGuidance?.signal_watch ?? null : draft.signal_watch,
+        falsifier: changed ? localGuidance?.falsifier ?? null : draft.falsifier,
       });
     }
     await analysis.set(`session:${session.session_id}`, { ...session, state: 'plan_draft',

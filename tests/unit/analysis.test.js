@@ -1,6 +1,56 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnalysisService } from '../../app/core/service/analysis.service.js';
+import { createAnalysisService, localAssistantGuidance, needsLocalDraftRepair } from '../../app/core/service/analysis.service.js';
+
+test('本机选品草案保留明确预算和商品偏好', () => {
+  const requirement = '我想买 20 元以内的文具，优先考虑笔记本和中性笔。';
+  const guidance = localAssistantGuidance(requirement);
+  assert.deepEqual(guidance.queries, ['笔记本', '中性笔', '文具']);
+  assert.equal(guidance.max_price, 20);
+  assert.equal(guidance.requirements, requirement);
+  assert.equal(localAssistantGuidance('A5 笔记本').max_price, null);
+});
+
+test('识别 30 快钱的原始输入，旧草案可自动识别并修复', () => {
+  const requirements = '我选品30快钱以内的文具，要求质量好 学生比较实用且愿意买的 不得不买的文具';
+  const guidance = localAssistantGuidance(requirements);
+  assert.equal(guidance.requirements, requirements);
+  assert.equal(guidance.max_price, 30);
+  assert.equal(guidance.recommendations.length, 25);
+  assert.deepEqual(guidance.queries.slice(0, 3), ['A5 横线笔记本', '0.5mm 中性笔套装', '学生透明文件袋']);
+  assert.equal(needsLocalDraftRepair({ local_fallback: true, queries: ['30快钱以内的文具'] }), true);
+});
+
+test('旧本机需求卡可重新整理 30 块钱以内的学生文具', async () => {
+  const requirements = '我选品30块钱以内我选品30块钱以内的文具，要求质量好 学生比较实用且愿意买的 不得不买的文具 的文具，要求质量好 学生比较实用且愿意买的 不得不买的文具';
+  const guidance = localAssistantGuidance(requirements);
+  assert.equal(guidance.max_price, 30);
+  assert.equal(guidance.queries.length, 25);
+  assert.deepEqual(guidance.queries.slice(0, 3), ['A5 横线笔记本', '0.5mm 中性笔套装', '学生透明文件袋']);
+  assert.deepEqual(guidance.recommendations.map(({ name }) => name), guidance.queries);
+  assert.match(guidance.recommendations[0].check, /纸张克重/);
+  assert.match(guidance.falsifier, /愿意购买需再验证/);
+  assert.equal(localAssistantGuidance('我选品３０块钱内的文具，学生用').max_price, 30);
+
+  const service = make();
+  await service.setMode('agent_assisted');
+  const started = await service.startAgentResearch({ taskType: 'direction_validation' });
+  const sessionId = started.data.session.session_id;
+  const staged = await service.applyAgentGuidance({ sessionId, expectedVersion: 1, localFallback: true,
+    guidance: { type: 'guided_plan', requirements, queries: ['30块钱以内我选品30块钱以内的文具'] } });
+  assert.equal(needsLocalDraftRepair(staged.data.draft), true);
+  assert.equal(needsLocalDraftRepair({ ...staged.data.draft, local_queries_edited: true }), false);
+  await service.updateGuidedPlan({ sessionId, expectedVersion: 2, action: 'preview' });
+  const refreshed = await service.updateGuidedPlan({ sessionId, expectedVersion: 3, action: 'refresh_local' });
+  assert.equal(refreshed.data.draft.max_price, 30);
+  assert.deepEqual(refreshed.data.draft.queries, guidance.queries);
+  assert.deepEqual(refreshed.data.draft.recommendations, guidance.recommendations);
+  assert.match(refreshed.data.draft.requirements_summary, /^学生实用文具/);
+  assert.equal(needsLocalDraftRepair(refreshed.data.draft), false);
+  assert.equal(refreshed.data.session.state, 'plan_draft');
+  const confirmed = await service.confirmPlan({ sessionId, expectedVersion: refreshed.data.session.version });
+  assert.deepEqual(confirmed.data.plan.units.map(({ keyword }) => keyword), guidance.queries);
+});
 
 function make(rows = []) {
   const kv = new Map();

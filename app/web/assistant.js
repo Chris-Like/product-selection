@@ -7,14 +7,22 @@ const message = document.querySelector('#guide-message');
 const nextCard = document.querySelector('#guide-next');
 const nextBody = document.querySelector('#guide-next-body');
 const nextToggle = document.querySelector('#guide-next-toggle');
-const sessionId = new URLSearchParams(location.search).get('session');
-const endpoint = `/api/assistant-guide/${encodeURIComponent(sessionId || '')}`;
+let sessionId = new URLSearchParams(location.search).get('session');
+let endpoint;
+const draftKey = () => `auto-pick-assistant-draft:${sessionId || 'new'}`;
 const configUrl = (site) => {
   const params = new URLSearchParams({ view: 'config' });
   if (sessionId) params.set('assistant', sessionId);
   if (site) params.set('site', site);
   return `/?${params}`;
 };
+
+function setSession(id) {
+  sessionId = id;
+  endpoint = `/api/assistant-guide/${encodeURIComponent(id)}`;
+  document.querySelector('#assistant-workbench').href = `/?assistant=${encodeURIComponent(id)}`;
+  document.querySelector('#assistant-settings').href = configUrl();
+}
 
 async function request(path, body) {
   const token = body ? (await request('/api/bootstrap')).token : null;
@@ -24,6 +32,9 @@ async function request(path, body) {
     body: JSON.stringify(body),
   } : {});
   const result = await response.json().catch(() => null);
+  if (response.status === 404 && path === '/api/assistant-guide' && body) {
+    throw new Error('当前选品台服务没有加载新接口。请在最新项目目录重启 npm start，再回到本页重试。');
+  }
   if (!response.ok || !result?.ok) throw new Error(result?.message || '本机选品服务暂时不可用，请刷新重试。');
   return result.data;
 }
@@ -210,29 +221,89 @@ function render(payload, { showRequirements = false, editedQueries } = {}) {
       el('p', { class: 'hint', text: '如果想让 AI 重新推荐搜索词，可以回到原对话继续。' }));
     return;
   }
-  panel.append(el('h3', { text: '这次要找的商品' }), el('p', { text: draft.requirements }));
+  panel.append(el('h3', { text: '本次选品目标' }), el('p', { text: draft.requirements_summary || draft.requirements }));
   if (draft.max_price != null) panel.append(el('p', { class: 'hint', text: `预算上限 ${draft.max_price} 元，用于结果统计。` }));
   if (draft.requirements_changed) panel.append(el('p', { class: 'hint', text: '需求已更新。请确认下方的原搜索词是否仍然合适。' }));
-  const input = el('textarea', { id: 'guided-queries', rows: 3, maxlength: 250 });
+  const input = el('textarea', { id: 'guided-queries', rows: 3, maxlength: 2025 });
   input.value = editedQueries ?? draft.queries.join('\n');
-  panel.append(el('label', { for: 'guided-queries', text: 'AI 推荐的搜索词（每行一个，可修改）' }), input,
-    el('p', { class: 'hint', text: '最多 3 个搜索词，每个词查看淘宝搜索结果的第一页。' }));
+  if (draft.local_fallback) {
+    panel.append(el('p', { class: 'guide-outcome', dataset: { state: 'partial' },
+      text: 'Codex 未能及时返回，以下是本机草案。采集后需要核对价格、规格和需求证据。' }));
+  }
+  panel.append(el('h3', { text: '推荐优先看的商品' }));
+  const recommendations = draft.recommendations || [];
+  const selectionKey = `auto-pick-assistant-selection:${session.session_id}`;
+  let savedSelection = {};
+  try { savedSelection = JSON.parse(localStorage.getItem(selectionKey) || '{}') || {}; } catch { /* 使用空选择 */ }
+  const choices = recommendations.map((item, index) => {
+    const id = `guide-selection-${index}`;
+    const check = el('input', { type: 'checkbox', id });
+    const query = el('input', { type: 'text', id: `${id}-query`, maxlength: 80 });
+    check.checked = Object.hasOwn(savedSelection, item.name);
+    query.value = check.checked ? savedSelection[item.name] : item.name;
+    const editor = el('div', { class: 'guide-query-editor' }, [el('label', { for: query.id, text: `${item.name}的搜索词` }), query]);
+    const row = el('li', {}, [el('label', { for: id, class: 'guide-product-choice' }, [check, el('strong', { text: item.name })]),
+      el('p', { text: item.reason }), el('p', { class: 'hint', text: `采集后核对：${item.check}` })]);
+    return { item, check, query, editor, row };
+  });
+  const selectionStatus = el('p', { class: 'hint', role: 'status' });
+  const all = el('button', { type: 'button', class: 'ghost', text: '全选' });
+  const none = el('button', { type: 'button', class: 'ghost', text: '清空选择' });
+  if (choices.length) {
+    panel.append(el('div', { class: 'inline-actions' }, [all, none]),
+      el('ol', { class: 'guide-recommendations' }, choices.map(({ row }) => row)));
+  } else {
+    panel.append(el('p', { class: 'hint', text: '当前没有具体商品建议。可以补充用途，或先采集候选，再根据实际价格和规格比较。' }));
+  }
   if (draft.signal_watch) panel.append(el('p', { text: `这轮重点看：${draft.signal_watch}` }));
   if (draft.falsifier) panel.append(el('p', { class: 'hint', text: `同时核对：${draft.falsifier}` }));
+  const queriesPanel = el('details', { class: 'guide-search-settings' }, [
+    el('summary', { text: '查看或编辑采集搜索词' }),
+    el('p', { class: 'hint', text: '每个选中的搜索词查看淘宝搜索结果的第一页。' }),
+    ...(choices.length ? choices.map(({ editor }) => editor) : [el('label', { for: 'guided-queries', text: '搜索词（每行一个，可修改）' }), input]),
+  ]);
+  panel.append(queriesPanel);
+  if (editedQueries !== undefined) queriesPanel.open = true;
   const notice = el('div', { class: 'inline-actions' });
   let version = session.version;
   let captureDraft = draft;
   let savedText = draft.queries.join('\n');
   let start;
-  const back = action('上一步', async () => {
+  function syncSelection() {
+    if (!choices.length) return;
+    const selected = choices.filter(({ check }) => check.checked);
+    selectionStatus.textContent = `已选 ${selected.length} / ${choices.length} 个，采集只执行已选商品。`;
+    for (const { check, editor } of choices) editor.hidden = !check.checked;
+    start.disabled = !selected.length;
+    all.disabled = selected.length === choices.length;
+    none.disabled = !selected.length;
+    localStorage.setItem(selectionKey, JSON.stringify(Object.fromEntries(selected.map(({ item, query }) => [item.name, query.value]))));
+  }
+  const refresh = draft.local_fallback ? action('重新整理搜索词', async () => {
     start.disabled = true;
+    back.disabled = true;
     try {
-      const current = await request(endpoint);
-      const unchanged = current.session.version === version;
-      render(current, { showRequirements: unchanged, editedQueries: unchanged ? input.value : undefined });
+      render(await request(endpoint, { action: 'refresh_local', expectedVersion: version }));
       step.focus();
     } finally {
       start.disabled = false;
+      back.disabled = false;
+      syncSelection();
+    }
+  }) : null;
+  refresh?.classList.add('ghost');
+  const back = action('上一步', async () => {
+    start.disabled = true;
+    if (refresh) refresh.disabled = true;
+    try {
+      const current = await request(endpoint);
+      const unchanged = current.session.version === version;
+      render(current, { showRequirements: unchanged, editedQueries: unchanged && !choices.length ? input.value : undefined });
+      step.focus();
+    } finally {
+      start.disabled = false;
+      if (refresh) refresh.disabled = false;
+      syncSelection();
     }
   });
   back.classList.add('ghost');
@@ -240,12 +311,23 @@ function render(payload, { showRequirements = false, editedQueries } = {}) {
     clearNode(notice);
     input.disabled = true;
     back.disabled = true;
+    if (refresh) refresh.disabled = true;
     try {
-      if (input.value !== savedText) {
-        const updated = await request(endpoint, { action: 'edit', expectedVersion: version, queries: input.value.split(/\r?\n/) });
+      const selected = choices.filter(({ check }) => check.checked);
+      const terms = choices.length ? selected.map(({ query }) => query.value.trim()) : input.value.split(/\r?\n/);
+      if (!terms.length || (choices.length && terms.some((term) => !term))) {
+        if (selected.length) queriesPanel.open = true;
+        throw new Error('请至少勾选一个商品，并填写搜索词。');
+      }
+      for (const { check, query } of choices) { check.disabled = true; query.disabled = true; }
+      all.disabled = true;
+      none.disabled = true;
+      const submitted = terms.join('\n');
+      if (submitted !== savedText) {
+        const updated = await request(endpoint, { action: 'edit', expectedVersion: version, queries: terms });
         version = updated.session.version;
         captureDraft = updated.draft;
-        savedText = input.value;
+        savedText = submitted;
       }
       const result = await capture(version, captureDraft.queries.length, notice);
       if (!result) return;
@@ -254,110 +336,123 @@ function render(payload, { showRequirements = false, editedQueries } = {}) {
     } finally {
       input.disabled = false;
       back.disabled = false;
+      if (refresh) refresh.disabled = false;
+      for (const { check, query } of choices) { check.disabled = false; query.disabled = false; }
+      syncSelection();
     }
   });
+  for (const { check, query } of choices) {
+    check.addEventListener('change', syncSelection);
+    query.addEventListener('input', syncSelection);
+  }
+  for (const [button, checked] of [[all, true], [none, false]]) {
+    button.addEventListener('click', () => {
+      for (const { check } of choices) check.checked = checked;
+      syncSelection();
+    });
+  }
+  syncSelection();
   panel.append(el('p', { class: 'hint', text: '待采集。确认搜索词后，点击「开始采集」。' }),
-    el('div', { class: 'inline-actions' }, [back, start]), notice);
+    el('div', { class: 'inline-actions guide-capture-actions' }, [back, start, refresh, choices.length ? selectionStatus : null]), notice);
 }
 
 function renderIntake(target) {
   const status = el('p', { class: 'hint assistant-intake-status', role: 'status' });
-  const hostStatus = el('p', { class: 'hint', role: 'status' });
-  const hostControls = el('div', { class: 'inline-actions' });
-  const handoffHint = el('p', { class: 'hint' });
-  let hostLabel = 'Codex 或 WorkBuddy';
   const goal = el('textarea', { id: 'assistant-intake', rows: 4, maxlength: 500,
     placeholder: '例如：我想买 20 元以内的文具，优先考虑笔记本和中性笔。' });
-  const handoff = el('div', { class: 'assistant-handoff', hidden: true });
-  const prompt = el('textarea', { id: 'assistant-prompt', rows: 4, readonly: true });
-  function makePrompt() {
-    const text = goal.value.trim();
-    if (!text) { goal.focus(); throw new Error('请先写下你想找什么。'); }
-    return `请使用 auto-pick-studio（智能选品助手）开始一个新的选品任务。我的需求：${text}\n请给出需求摘要、搜索词及选品关注点，并给我「打开需求卡」的链接。我会在确认后点击「开始采集」。`;
-  }
-  const prepare = action('手动复制需求', () => {
-    prompt.value = makePrompt();
-    handoff.hidden = false;
-    handoffHint.textContent = `粘贴到已安装选品助手的 ${hostLabel} 新对话，再点 AI 返回的「打开需求卡」。`;
-    prompt.focus();
-    prompt.select();
-  }, status);
-  const copy = action('复制需求', async () => {
-    try {
-      await navigator.clipboard.writeText(prompt.value);
-      status.textContent = `已复制，粘贴到 ${hostLabel} 的新对话即可。`;
-    } catch {
-      prompt.focus();
-      prompt.select();
-      status.textContent = '文字已选中，按 Ctrl+C 复制。';
-    }
-  }, status);
+  const key = draftKey();
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem(key) || 'null'); }
+  catch { stored = null; }
+  goal.value = stored?.requirements || '';
+  status.textContent = stored?.message || '';
+  const save = (draft) => {
+    stored = draft;
+    localStorage.setItem(key, JSON.stringify(draft));
+  };
   goal.addEventListener('input', () => {
-    handoff.hidden = true;
+    save({ requirements: goal.value });
     status.textContent = '';
   });
-  handoff.append(el('label', { for: 'assistant-prompt', text: '发给 AI 的需求' }), prompt, copy, handoffHint);
-
-  function launchButton(config) {
-    if (config.host === 'workbuddy' && config.mode === 'prefill') {
-      return action('在 WorkBuddy 打开', async () => {
-        const result = await request('/api/assistant-host/workbuddy-link', { prompt: makePrompt() });
-        location.assign(result.url);
-      }, status);
+  const next = action('下一步：生成选品建议', async () => {
+    const requirements = goal.value.trim();
+    if (!requirements) {
+      goal.focus();
+      throw new Error('请先写下你想找什么。');
     }
-    if (config.host !== 'codex') return null;
-    const link = el('a', { class: 'host-launch', href: 'codex://threads/new', text: '在 Codex 打开' });
-    link.addEventListener('click', (event) => {
-      try {
-        const query = new URLSearchParams({ prompt: makePrompt() });
-        if (config.workspace) query.set('path', config.workspace);
-        link.href = `codex://threads/new?${query}`;
-        status.textContent = '需求已准备好。请在 Codex 对话中核对并发送。';
-      } catch (error) { event.preventDefault(); status.textContent = error.message; }
-    });
-    return link;
-  }
-
-  async function loadHost() {
-    hostStatus.textContent = '正在读取 AI 配置…';
+    if (target === panel) {
+      showStage(2, '正在生成选品建议');
+      step.focus();
+    }
+    status.textContent = '正在等待 Codex 生成建议。若未及时返回，将先展示可编辑的本机草案。';
+    goal.readOnly = true;
     try {
-      const config = await request('/api/assistant-host');
-      if (!['codex', 'workbuddy'].includes(config?.host)) throw new Error('AI 配置不可用');
-      hostLabel = config.host === 'workbuddy' ? 'WorkBuddy' : 'Codex';
-      hostStatus.textContent = config.host === 'workbuddy' && config.mode === 'manual'
-        ? 'WorkBuddy 直连尚未配置，可以手动复制需求。' : `当前使用 ${hostLabel}`;
-      const launch = launchButton(config);
-      if (launch) hostControls.prepend(launch);
-      retry.remove();
-    } catch {
-      hostStatus.textContent = '暂时无法读取 AI 配置，仍可填写并手动复制需求。';
-      hostControls.append(retry);
+      if (!stored?.id) save({ id: crypto.randomUUID(), requirements });
+      let job = stored.started ? null : await request('/api/assistant-guide', { jobId: stored.id, requirements });
+      if (job && !job.id) throw new Error('请重启选品台服务，加载最新的任务恢复接口。');
+      if (job) {
+        goal.value = job.requirements;
+        save({ id: job.id, requirements: job.requirements, started: true });
+      }
+      const progressUrl = `/api/assistant-guide?job=${encodeURIComponent(stored.id)}`;
+      while (!job || job.state === 'running') {
+        if (job) await new Promise((resolve) => setTimeout(resolve, 1500));
+        job = await request(progressUrl);
+        if (!job) {
+          const message = '本机服务已重启或任务已过期。需求已保留，可以重新生成。';
+          save({ requirements: goal.value, message });
+          throw new Error(message);
+        }
+      }
+      if (job.state === 'failed') {
+        save({ requirements: goal.value, message: job.message });
+        throw new Error(job.message);
+      }
+      const result = job.result;
+      save({ requirements: goal.value, resultSession: result.session.session_id });
+      setSession(result.session.session_id);
+      const url = new URL(location.href);
+      url.searchParams.set('session', sessionId);
+      history.pushState(null, '', url);
+      clearNode(nextBody);
+      nextBody.hidden = true;
+      nextCard.hidden = true;
+      nextToggle.setAttribute('aria-expanded', 'false');
+      message.textContent = '';
+      render(result);
+      step.focus();
+    } catch (error) {
+      if (target === panel) showStage(1, '说一句你想找什么');
+      throw error;
+    } finally {
+      goal.readOnly = false;
     }
+  }, status);
+  const controls = el('div', { class: 'inline-actions' }, [next, el('a', { href: configUrl(), target: '_blank', rel: 'noopener', text: 'AI 配置' })]);
+  if (stored?.resultSession) {
+    controls.append(el('a', { href: `/assistant.html?session=${encodeURIComponent(stored.resultSession)}`, text: '查看上次生成的建议' }));
   }
-  const retry = action('重试连接 AI', loadHost, status);
-  retry.classList.add('ghost');
-  hostControls.append(prepare);
   target.append(el('label', { for: 'assistant-intake', text: target === panel ? '这次的选品需求' : '下一个商品的需求' }),
-    goal, hostControls, hostStatus, handoff, status);
-  target.append(el('p', { class: 'hint' }, [el('a', { href: configUrl(), text: '切换 AI' })]));
-  target.append(el('p', { class: 'hint' }, [el('a', { href: '/#retail-research', text: '已有搜索词？直接查国内商品' })]));
-  void loadHost();
+    goal, controls, status,
+    el('p', { class: 'hint' }, [el('a', { href: '/#retail-research', text: '已有搜索词？直接查国内商品' })]));
+  if (stored?.id) next.click();
   return goal;
 }
 
 async function init() {
   if (!sessionId) {
-    step.textContent = '说一句你想找什么';
+    showStage(1, '说一句你想找什么');
     renderIntake(panel);
     return;
   }
-  document.querySelector('#assistant-workbench').href = `/?assistant=${encodeURIComponent(sessionId)}`;
-  document.querySelector('#assistant-settings').href = configUrl();
+  setSession(sessionId);
   try {
     const payload = await request(endpoint);
-    if (payload.session.state === 'requirements_ready') {
+    const initialAction = payload.needs_local_repair ? 'refresh_local'
+      : payload.session.state === 'requirements_ready' ? 'preview' : null;
+    if (initialAction) {
       try {
-        render(await request(endpoint, { action: 'preview', expectedVersion: payload.session.version }));
+        render(await request(endpoint, { action: initialAction, expectedVersion: payload.session.version }));
       } catch {
         render(await request(endpoint).catch(() => payload));
       }
@@ -369,6 +464,9 @@ async function init() {
     panel.append(el('a', { href: '/assistant.html', class: 'host-launch', text: '新建选品需求' }));
     message.textContent = error.message;
   }
+  if (!nextCard.hidden && localStorage.getItem(draftKey())) nextToggle.click();
 }
 
+window.addEventListener('popstate', () => location.reload());
+window.addEventListener('pageshow', (event) => { if (event.persisted) location.reload(); });
 init();
