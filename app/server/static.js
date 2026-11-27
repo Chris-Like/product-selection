@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const chartBundle = fileURLToPath(new URL('../../node_modules/echarts/dist/echarts.min.js', import.meta.url));
 
 const MIME = Object.freeze({
   '.html': 'text/html; charset=utf-8',
@@ -9,7 +12,7 @@ const MIME = Object.freeze({
   '.svg': 'image/svg+xml',
 });
 
-/** 只服务 app/web 目录内的文件；目录穿越一律 403。 */
+/** 只服务 app/web 和固定的图表依赖。 */
 export async function serveStatic(webDir, pathname, res) {
   const rel = pathname === '/' || pathname === '' ? 'index.html' : pathname.replace(/^\/+/, '');
   const root = path.resolve(webDir);
@@ -20,7 +23,7 @@ export async function serveStatic(webDir, pathname, res) {
     return;
   }
   try {
-    const buf = await fs.readFile(target);
+    const buf = await fs.readFile(pathname === '/vendor/echarts.min.js' ? chartBundle : target);
     res.writeHead(200, { 'content-type': MIME[path.extname(target)] || 'application/octet-stream' });
     res.end(buf);
   } catch {

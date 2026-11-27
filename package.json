@@ -15,5 +15,8 @@
   },
   "optionalDependencies": {
     "playwright": "1.64.0"
+  },
+  "dependencies": {
+    "echarts": "6.1.0"
   }
 }

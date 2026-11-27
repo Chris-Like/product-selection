@@ -23,7 +23,17 @@
     <button id="auth-alert-go" class="ghost" type="button">去配置页重新登录</button>
   </div>
 
-  <main>
+  <main class="workspace-layout">
+    <nav class="workspace-nav" aria-label="专业工作台导航">
+      <a href="#tasks" data-workspace-link="tasks" aria-current="page">选品任务</a>
+      <a href="#results" data-workspace-link="results">商品结果</a>
+      <span class="workspace-nav-label">数据源</span>
+      <a href="#retail-research" data-workspace-link="retail-research">国内零售</a>
+      <a href="#fastmoss-research" data-workspace-link="fastmoss-research">FastMoss 趋势</a>
+      <a href="#linkfox-research" data-workspace-link="linkfox-research">LinkFox 选品与货源</a>
+      <a href="#config" data-workspace-link="config">基础配置</a>
+    </nav>
+    <div class="workspace-content">
     <div class="page-heading">
       <h1 id="workspace-title">专业工作台</h1>
       <div class="workspace-state" aria-label="本机状态">
@@ -65,14 +75,27 @@
           <span id="assistant-host-status" class="footnote" role="status"></span>
         </div>
       </div>
+      <section class="card" aria-labelledby="data-management-title">
+        <h2 id="data-management-title">数据管理</h2>
+        <div class="inline-actions">
+          <button id="btn-undo" class="ghost">撤销</button>
+          <button id="btn-restore" class="ghost">恢复</button>
+          <button id="btn-clear" class="ghost danger">清空</button>
+          <span id="clear-confirm" class="hidden">
+            确定清空本机能采到的业务数据？<button id="btn-clear-yes" class="danger">确定清空</button>
+            <button id="btn-clear-no" class="ghost">取消</button>
+          </span>
+        </div>
+      </section>
     </section>
 
     <section id="panel-workbench" class="panel" role="tabpanel" aria-labelledby="tab-workbench">
-      <nav class="module-links" aria-label="选品数据模块">
-        <a href="#retail-research" data-open-module="retail-research">国内零售</a>
-        <a href="#fastmoss-research" data-open-module="fastmoss-research">FastMoss 趋势</a>
-        <a href="#linkfox-research" data-open-module="linkfox-research">LinkFox 选品与货源</a>
-      </nav>
+      <section id="tasks" data-workspace-view="tasks">
+      <section id="linked-task" class="card linked-task" aria-labelledby="linked-task-title" hidden>
+        <h2 id="linked-task-title">助手选品任务</h2>
+        <p id="linked-task-meta" class="hint"></p>
+        <div id="linked-task-actions" class="inline-actions"></div>
+      </section>
       <div id="capture" class="card">
         <h2>当前生效计划</h2>
         <div id="plan-summary" class="plan-summary" aria-live="polite">正在读取计划…</div>
@@ -80,6 +103,7 @@
           <button id="btn-capture" disabled>开始采集</button>
           <button id="btn-edit-plan" type="button" class="ghost">编辑计划</button>
           <button id="btn-stop" class="ghost" disabled>停止</button>
+          <a id="task-results-link" href="#results" class="host-launch" hidden>查看本轮结果</a>
         </div>
         <div id="task-progress" class="list"></div>
         <div id="task-message" class="hint"></div>
@@ -103,7 +127,18 @@
         </form>
       </details>
 
-      <div id="results" class="card">
+      <details id="runs-panel" class="card">
+        <summary>采集历史 <span id="runs-count">0</span> 轮</summary>
+        <div id="run-list" class="list"></div>
+      </details>
+      <details id="guide" class="card">
+        <summary>AI 对话任务</summary>
+        <p id="agent-task-state" class="footnote">暂无 AI 选品任务</p>
+        <p id="agent-task-detail" class="footnote"></p>
+      </details>
+      </section>
+
+      <div id="results" class="card" data-workspace-view="results" hidden>
         <h2>选品结果</h2>
         <p class="hint">领先标的（被代拍的品）是经验信号、非预测结论；默认参与排序，可临时关闭看原序，也可看反例。</p>
         <div class="run-strip" id="run-strip">
@@ -115,32 +150,42 @@
           <span id="scope-note" class="footnote"></span>
         </div>
         <div id="run-outcome" class="plan-summary" role="status"></div>
-        <div id="facts-content" class="result-facts"></div>
+        <div class="result-charts">
+        <section id="result-chart-panel" class="result-chart-panel" aria-labelledby="result-chart-title" hidden>
+          <h3 id="result-chart-title"></h3>
+          <p id="result-chart-note" class="hint"></p>
+          <div id="result-chart" class="result-chart" role="img"></div>
+          <div id="result-chart-filters" class="evidence-options"></div>
+        </section>
+        <section id="product-chart-panel" class="result-chart-panel" aria-labelledby="product-chart-title" hidden>
+          <h3 id="product-chart-title">各商品方向的采集分布</h3>
+          <p class="hint">按本轮搜索词统计。点击条形或选择商品方向，可筛选下方明细。</p>
+          <div class="product-chart-scroll" tabindex="0" aria-label="滚动查看所有商品方向">
+            <div id="product-chart" class="result-chart" role="img"></div>
+          </div>
+          <label class="product-chart-filter">商品方向 <select id="product-chart-select"></select></label>
+        </section>
+        </div>
+        <details class="result-facts-details">
+          <summary>查看统计口径与查询明细</summary>
+          <div id="facts-content" class="result-facts"></div>
+          <div id="coverage" class="footnote"></div>
+        </details>
+        <h3 class="result-table-heading">商品明细</h3>
         <div class="inline-actions">
           <button id="btn-temp-off" class="ghost">临时关闭领先优先</button>
           <button id="btn-counter" class="ghost">反例视图</button>
-          <button id="btn-undo" class="ghost">撤销</button>
-          <button id="btn-restore" class="ghost">恢复</button>
-          <button id="btn-clear" class="ghost danger">清空</button>
-          <span id="clear-confirm" class="hidden">
-            确定清空本机能采到的业务数据？<button id="btn-clear-yes" class="danger">确定清空</button>
-            <button id="btn-clear-no" class="ghost">取消</button>
-          </span>
         </div>
-        <div id="coverage" class="footnote"></div>
         <div id="evidence-controls" class="inline-actions hidden">
           <span id="evidence-status" role="status"></span>
           <button id="btn-clear-evidence" class="ghost" type="button">返回全部明细</button>
         </div>
         <div id="result-list" class="list"></div>
+        <nav id="result-pagination" class="result-pagination" aria-label="商品明细分页" hidden></nav>
       </div>
 
-      <details id="runs-panel" class="card">
-        <summary>采集记录 <span id="runs-count">0</span> 轮 <span class="footnote">· 点任一轮切换上面的结果，不跳页</span></summary>
-        <div id="run-list" class="list"></div>
-      </details>
-      <details id="retail-research" class="card">
-        <summary>国内零售 · 接口查询、表格导入与原页核验</summary>
+      <section id="retail-research" class="card" data-workspace-view="retail-research" hidden>
+        <h2>查询或导入国内商品</h2>
         <h3>淘宝联盟查询</h3>
         <p id="retail-api-state" class="hint"></p>
         <form id="retail-search-form" class="professional-plan-form">
@@ -161,28 +206,27 @@
         <p id="retail-feedback" role="status"></p>
         <div class="list" data-reports="taobao_alliance"></div>
         <div class="list" data-reports="retail_csv"></div>
-      </details>
-      <details id="fastmoss-research" class="card">
-        <summary>FastMoss · TikTok Shop 趋势</summary>
+      </section>
+      <section id="fastmoss-research" class="card" data-workspace-view="fastmoss-research" hidden>
+        <h2>TikTok Shop 趋势报告</h2>
         <p class="hint">在已授权的 Codex 或 WorkBuddy 中调用 FastMoss，回传后在这里查看对应市场和时间窗的结果。</p>
         <div class="list" data-reports="fastmoss"></div>
         <button class="ghost" type="button" data-refresh-reports="fastmoss">刷新 FastMoss 记录</button>
-      </details>
-      <details id="linkfox-research" class="card">
-        <summary>LinkFox · 跨境选品与 1688 货源</summary>
+      </section>
+      <section id="linkfox-research" class="card" data-workspace-view="linkfox-research" hidden>
+        <h2>跨境选品与 1688 货源报告</h2>
         <p class="hint">使用宿主中已授权的 LinkFox 选品或货源能力，结果按来源平台和币种展示。</p>
         <div class="list" data-reports="linkfox"></div>
         <button class="ghost" type="button" data-refresh-reports="linkfox">刷新 LinkFox 记录</button>
-      </details>
-      <details id="guide" class="card">
-        <summary>AI 对话任务</summary>
-        <p class="hint">在 Codex 或 WorkBuddy 继续当前对话。</p>
-        <p id="agent-task-state" class="footnote">暂无 AI 选品任务</p>
-        <p id="agent-task-detail" class="footnote"></p>
-      </details>
+      </section>
     </section>
+    </div>
   </main>
 
+  <dialog id="product-detail" class="product-drawer" aria-labelledby="product-detail-title">
+    <header><h2 id="product-detail-title">商品详情</h2><form method="dialog"><button class="ghost" autofocus>关闭</button></form></header>
+    <div id="product-detail-body"></div>
+  </dialog>
   <div id="toast" class="toast" aria-live="polite"></div>
   <script type="module" src="/app.js"></script>
 </body>
